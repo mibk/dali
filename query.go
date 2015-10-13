@@ -17,7 +17,7 @@ func (q *Query) SQL() (query string, args []interface{}) {
 // Exec executes a query that doesn't return rows.
 // For example: an INSERT and UPDATE.
 func (q *Query) Exec() (sql.Result, error) {
-	sql, err := q.preproc.Process(q.SQL())
+	sql, err := q.process()
 	if err != nil {
 		return nil, err
 	}
@@ -36,7 +36,7 @@ func (q *Query) MustExec() sql.Result {
 // Query executes a query that returns rows, typically a SELECT.
 // The args are for any placeholder parameters in the query.
 func (q *Query) Rows() (*sql.Rows, error) {
-	sql, err := q.preproc.Process(q.SQL())
+	sql, err := q.process()
 	if err != nil {
 		return nil, err
 	}
@@ -47,11 +47,24 @@ func (q *Query) Rows() (*sql.Rows, error) {
 // Row always return a non-nil value. Errors are deferred until
 // Row's Scan method is called.
 func (q *Query) Row() *Row {
-	sql, err := q.preproc.Process(q.SQL())
+	sql, err := q.process()
 	if err != nil {
 		return &Row{err: err}
 	}
 	return &Row{Row: q.execer.QueryRow(sql)}
+}
+
+func (q *Query) String() string {
+	sql, err := q.process()
+	if err != nil {
+		panic(err)
+	}
+	return sql
+}
+
+// process returns a preprocessed SQL query.
+func (q *Query) process() (sql string, err error) {
+	return q.preproc.Process(q.SQL())
 }
 
 // Row is a wrapper around sql.Row.
