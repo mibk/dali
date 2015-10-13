@@ -13,13 +13,13 @@ func TestPreprocess(t *testing.T) {
 		expSql string
 		expErr error
 	}{
-		{"SELECT * FROM [x] WHERE a = ?", []interface{}{nil},
-			"SELECT * FROM {x} WHERE a = ?", nil},
+		{"SELECT * FROM [x] WHERE a = ? AND b = ?", []interface{}{3, "four"},
+			"SELECT * FROM {x} WHERE a = 3 AND b = 'four'", nil},
 	}
 
-	driver := FakeDriver{}
+	preproc := NewPreprocessor(FakeDriver{})
 	for _, test := range tests {
-		str, err := Preprocess(driver, test.sql, test.args)
+		str, err := preproc.Process(test.sql, test.args)
 		if err != test.expErr {
 			t.Errorf("\ngot error: %v\nwant: %v", err, test.expErr)
 		}

@@ -9,13 +9,13 @@ import (
 
 // Connection is a connection to the database.
 type Connection struct {
-	DB     *sql.DB
-	driver drivers.Driver
+	DB      *sql.DB
+	preproc *Preprocessor
 }
 
 // NewConnection instantiates a Connection for the given database/sql connection.
 func NewConnection(db *sql.DB, driver drivers.Driver) *Connection {
-	return &Connection{db, driver}
+	return &Connection{db, NewPreprocessor(driver)}
 }
 
 // Open opens a database by calling sql.Open. It returns new Connection
@@ -68,10 +68,10 @@ func (c *Connection) Ping() error {
 // Query creates Query by the raw SQL query and args.
 func (c *Connection) Query(query string, args ...interface{}) *Query {
 	return &Query{
-		execer: c.DB,
-		driver: c.driver,
-		query:  query,
-		args:   args,
+		execer:  c.DB,
+		preproc: c.preproc,
+		query:   query,
+		args:    args,
 	}
 }
 

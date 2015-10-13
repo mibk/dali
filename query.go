@@ -1,16 +1,12 @@
 package dali
 
-import (
-	"database/sql"
-
-	"github.com/mibk/dali/drivers"
-)
+import "database/sql"
 
 type Query struct {
-	execer execer
-	driver drivers.Driver
-	query  string
-	args   []interface{}
+	execer  execer
+	preproc *Preprocessor
+	query   string
+	args    []interface{}
 }
 
 // SQL returns the raw SQL query and the args.
@@ -21,11 +17,11 @@ func (q *Query) SQL() (query string, args []interface{}) {
 // Exec executes a query that doesn't return rows.
 // For example: an INSERT and UPDATE.
 func (q *Query) Exec() (sql.Result, error) {
-	sql, err := Preprocess(q.driver, q.query, nil)
+	sql, err := q.preproc.Process(q.SQL())
 	if err != nil {
 		return nil, err
 	}
-	return q.execer.Exec(sql, q.args...)
+	return q.execer.Exec(sql)
 }
 
 // MustExec is like Exec but panics on error.
@@ -40,22 +36,22 @@ func (q *Query) MustExec() sql.Result {
 // Query executes a query that returns rows, typically a SELECT.
 // The args are for any placeholder parameters in the query.
 func (q *Query) Rows() (*sql.Rows, error) {
-	sql, err := Preprocess(q.driver, q.query, nil)
+	sql, err := q.preproc.Process(q.SQL())
 	if err != nil {
 		return nil, err
 	}
-	return q.execer.Query(sql, q.args...)
+	return q.execer.Query(sql)
 }
 
 // Row executes a query that is expected to return at most one row.
 // Row always return a non-nil value. Errors are deferred until
 // Row's Scan method is called.
 func (q *Query) Row() *Row {
-	sql, err := Preprocess(q.driver, q.query, nil)
+	sql, err := q.preproc.Process(q.SQL())
 	if err != nil {
 		return &Row{err: err}
 	}
-	return &Row{Row: q.execer.QueryRow(sql, q.args...)}
+	return &Row{Row: q.execer.QueryRow(sql)}
 }
 
 // Row is a wrapper around sql.Row.
