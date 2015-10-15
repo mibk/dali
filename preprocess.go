@@ -185,6 +185,8 @@ func (p *Preprocessor) printSetClause(b *bytes.Buffer, v interface{}) error {
 	return nil
 }
 
+// deriveColsAndVals derives column names from an underlying type of v and returns
+// them together with the corresponding values.
 func deriveColsAndVals(v interface{}) (cols []string, vals []interface{}, err error) {
 	switch v := v.(type) {
 	case Map:
@@ -194,6 +196,9 @@ func deriveColsAndVals(v interface{}) (cols []string, vals []interface{}, err er
 		}
 	default:
 		vv := reflect.ValueOf(v)
+		if vv.Kind() == reflect.Ptr {
+			vv = reflect.Indirect(vv)
+		}
 		if vv.Kind() != reflect.Struct {
 			return nil, nil, ErrInvalidValue
 		}
@@ -210,7 +215,16 @@ func (p *Preprocessor) printMultiValuesClause(b *bytes.Buffer, v interface{}) er
 	if vv.Kind() != reflect.Slice {
 		return ErrInvalidValue
 	}
-	cols, indexes := colNamesAndFieldIndexes(vv.Type().Elem())
+	el := vv.Type().Elem()
+	isPtr := false
+	if el.Kind() == reflect.Ptr {
+		el = el.Elem()
+		isPtr = true
+	}
+	if el.Kind() != reflect.Struct {
+		return ErrInvalidValue
+	}
+	cols, indexes := colNamesAndFieldIndexes(el)
 	b.WriteRune('(')
 	for i, c := range cols {
 		p.driver.EscapeIdent(b, c)
@@ -221,7 +235,11 @@ func (p *Preprocessor) printMultiValuesClause(b *bytes.Buffer, v interface{}) er
 	b.WriteString(") VALUES")
 	for i, length := 0, vv.Len(); i < length; i++ {
 		b.WriteString(" (")
-		vals := valuesByFieldIndexes(vv.Index(i), indexes)
+		el := vv.Index(i)
+		if isPtr {
+			el = reflect.Indirect(el)
+		}
+		vals := valuesByFieldIndexes(el, indexes)
 		for i, v := range vals {
 			p.escapeValue(b, v)
 			if i != len(vals)-1 {
@@ -236,6 +254,8 @@ func (p *Preprocessor) printMultiValuesClause(b *bytes.Buffer, v interface{}) er
 	return nil
 }
 
+// colNamesAndFieldIndexes derives column names from a struct type and returns
+// them together with the indexes of used fields. typ must by a struct type.
 func colNamesAndFieldIndexes(typ reflect.Type) (cols []string, indexes []int) {
 	for i := 0; i < typ.NumField(); i++ {
 		f := typ.Field(i)

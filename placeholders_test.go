@@ -24,6 +24,15 @@ var placeholderTests = []struct {
 
 	{"SELECT * FROM user WHERE id IN (?...)", Args{[]int{1, 4, 7, 11}},
 		"SELECT * FROM user WHERE id IN (1, 4, 7, 11)", nil},
+
+	{"INSERT ?values", Args{&User{1, "Rudolf", 0}},
+		"INSERT ({id}, {user_name}) VALUES (1, 'Rudolf')", nil},
+	{"INSERT ?values...", Args{[]*User{{1, "Martin", 0}}},
+		"INSERT ({id}, {user_name}) VALUES (1, 'Martin')", nil},
+	{"INSERT ?values", Args{ptrPtrUser()},
+		"", ErrInvalidValue},
+	{"INSERT ?values...", Args{[]**User{}},
+		"", ErrInvalidValue},
 }
 
 func TestPlaceholders(t *testing.T) {
@@ -45,4 +54,9 @@ type User struct {
 	ID     int64
 	Name   string `db:"user_name"`
 	Ignore int    `db:"-"`
+}
+
+func ptrPtrUser() **User {
+	u := &User{}
+	return &u
 }
