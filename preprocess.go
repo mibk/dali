@@ -75,6 +75,8 @@ func (p *Preprocessor) interpolate(b *bytes.Buffer, typ string, v interface{}) e
 	switch typ {
 	case "":
 		return p.escapeValue(b, v)
+	case "...":
+		return p.escapeMultipleValues(b, v)
 	case "ident":
 		col, ok := v.(string)
 		if !ok {
@@ -118,6 +120,23 @@ func (p *Preprocessor) escapeValue(b *bytes.Buffer, v interface{}) error {
 		p.driver.EscapeString(b, s)
 	default:
 		return ErrInvalidValue
+	}
+	return nil
+}
+
+func (p *Preprocessor) escapeMultipleValues(b *bytes.Buffer, v interface{}) error {
+	vv := reflect.ValueOf(v)
+	if vv.Kind() != reflect.Slice {
+		return ErrInvalidValue
+	}
+	length := vv.Len()
+	for i := 0; i < length; i++ {
+		if err := p.escapeValue(b, vv.Index(i).Interface()); err != nil {
+			return err
+		}
+		if i != length-1 {
+			b.WriteString(", ")
+		}
 	}
 	return nil
 }

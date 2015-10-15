@@ -21,6 +21,9 @@ var placeholderTests = []struct {
 			"(2, 'John')", nil},
 	{"UPDATE [user] ?set WHERE [id] = ?", Args{User{10, "Selma", 0}, 1},
 		"UPDATE {user} SET {id} = 10, {user_name} = 'Selma' WHERE {id} = 1", nil},
+
+	{"SELECT * FROM user WHERE id IN (?...)", Args{[]int{1, 4, 7, 11}},
+		"SELECT * FROM user WHERE id IN (1, 4, 7, 11)", nil},
 }
 
 func TestPlaceholders(t *testing.T) {
