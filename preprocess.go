@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"database/sql/driver"
 	"errors"
+	"fmt"
 	"reflect"
 	"strconv"
 	"strings"
@@ -13,10 +14,11 @@ import (
 )
 
 var (
-	ErrArgumentMismatch = errors.New("mismatch between placeholders and arguments")
-	ErrInvalidSyntax    = errors.New("SQL syntax error")
-	ErrInvalidValue     = errors.New("trying to interpolate invalid value")
-	ErrNotUTF8          = errors.New("invalid UTF-8")
+	ErrArgumentMismatch   = errors.New("mismatch between placeholders and arguments")
+	ErrInvalidSyntax      = errors.New("SQL syntax error")
+	ErrInvalidValue       = errors.New("trying to interpolate invalid value")
+	ErrInvalidPlaceholder = errors.New("invalid placeholder")
+	ErrNotUTF8            = errors.New("invalid UTF-8")
 )
 
 type Preprocessor struct {
@@ -29,7 +31,7 @@ func NewPreprocessor(driver drivers.Driver) *Preprocessor {
 
 // Preprocess processes the sql using the driver.
 func (p *Preprocessor) Process(sql string, args []interface{}) (string, error) {
-	buf := new(bytes.Buffer)
+	b := new(bytes.Buffer)
 	pos := 0
 	argIndex := 0
 	for pos < len(sql) {
@@ -43,50 +45,199 @@ func (p *Preprocessor) Process(sql string, args []interface{}) (string, error) {
 				return "", ErrInvalidSyntax
 			}
 			col := sql[pos : pos+w]
-			p.driver.EscapeIdent(buf, col)
+			p.driver.EscapeIdent(b, col)
 			pos += w + 1 // size of ']'
 		case '?':
+			start := pos
+			for {
+				r, w := utf8.DecodeRuneInString(sql[pos:])
+				if (r < 'a' || r > 'z') && r != '.' {
+					break
+				}
+				pos += w
+			}
 			if argIndex >= len(args) {
 				return "", ErrArgumentMismatch
 			}
-			if err := p.interpolate(buf, args[argIndex]); err != nil {
+			if err := p.interpolate(b, sql[start:pos], args[argIndex]); err != nil {
 				return "", err
 			}
 			argIndex++
 		default:
-			buf.WriteRune(r)
+			b.WriteRune(r)
 		}
 	}
 
-	return buf.String(), nil
+	return b.String(), nil
 }
 
-func (p *Preprocessor) interpolate(buf *bytes.Buffer, v interface{}) error {
+func (p *Preprocessor) interpolate(b *bytes.Buffer, typ string, v interface{}) error {
+	switch typ {
+	case "":
+		return p.escapeValue(b, v)
+	case "ident":
+		col, ok := v.(string)
+		if !ok {
+			return ErrInvalidValue
+		}
+		p.driver.EscapeIdent(b, col)
+	case "values":
+		return p.printValuesClause(b, v)
+	case "values...":
+		return p.printMultiValuesClause(b, v)
+	case "set":
+		return p.printSetClause(b, v)
+	default:
+		return fmt.Errorf("invalid placeholder: %s", typ)
+	}
+	return nil
+}
+
+func (p *Preprocessor) escapeValue(b *bytes.Buffer, v interface{}) error {
 	if valuer, ok := v.(driver.Valuer); ok {
 		var err error
 		if v, err = valuer.Value(); err != nil {
 			return err
 		}
 	}
-
-	val := reflect.ValueOf(v)
-	switch val.Kind() {
+	vv := reflect.ValueOf(v)
+	switch vv.Kind() {
 	case reflect.Bool:
-		p.driver.EscapeBool(buf, val.Bool())
+		p.driver.EscapeBool(b, vv.Bool())
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		buf.WriteString(strconv.FormatInt(val.Int(), 10))
+		b.WriteString(strconv.FormatInt(vv.Int(), 10))
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		buf.WriteString(strconv.FormatUint(val.Uint(), 10))
+		b.WriteString(strconv.FormatUint(vv.Uint(), 10))
 	case reflect.Float32, reflect.Float64:
-		buf.WriteString(strconv.FormatFloat(val.Float(), 'f', -1, 64))
+		b.WriteString(strconv.FormatFloat(vv.Float(), 'f', -1, 64))
 	case reflect.String:
-		s := val.String()
+		s := vv.String()
 		if !utf8.ValidString(s) {
 			return ErrNotUTF8
 		}
-		p.driver.EscapeString(buf, s)
+		p.driver.EscapeString(b, s)
 	default:
 		return ErrInvalidValue
 	}
 	return nil
+}
+
+// Map is just an alias for map[string]interface{}. It's shorter.
+type Map map[string]interface{}
+
+func (p *Preprocessor) printValuesClause(b *bytes.Buffer, v interface{}) error {
+	cols, vals, err := deriveColsAndVals(v)
+	if err != nil {
+		return err
+	}
+	b.WriteRune('(')
+	for i, c := range cols {
+		p.driver.EscapeIdent(b, c)
+		if i != len(vals)-1 {
+			b.WriteString(", ")
+		}
+	}
+	b.WriteString(") VALUES (")
+	for i, v := range vals {
+		p.escapeValue(b, v)
+		if i != len(vals)-1 {
+			b.WriteString(", ")
+		}
+	}
+	b.WriteRune(')')
+	return nil
+}
+
+func (p *Preprocessor) printSetClause(b *bytes.Buffer, v interface{}) error {
+	cols, vals, err := deriveColsAndVals(v)
+	if err != nil {
+		return err
+	}
+	b.WriteString("SET ")
+	for i, c := range cols {
+		v := vals[i]
+		p.driver.EscapeIdent(b, c)
+		b.WriteString(" = ")
+		p.escapeValue(b, v)
+		if i != len(vals)-1 {
+			b.WriteString(", ")
+		}
+	}
+	return nil
+}
+
+func deriveColsAndVals(v interface{}) (cols []string, vals []interface{}, err error) {
+	switch v := v.(type) {
+	case Map:
+		for k, v := range v {
+			cols = append(cols, k)
+			vals = append(vals, v)
+		}
+	default:
+		vv := reflect.ValueOf(v)
+		if vv.Kind() != reflect.Struct {
+			return nil, nil, ErrInvalidValue
+		}
+		var indexes []int
+		cols, indexes = colNamesAndFieldIndexes(vv.Type())
+		vals = valuesByFieldIndexes(vv, indexes)
+
+	}
+	return
+}
+
+func (p *Preprocessor) printMultiValuesClause(b *bytes.Buffer, v interface{}) error {
+	vv := reflect.ValueOf(v)
+	if vv.Kind() != reflect.Slice {
+		return ErrInvalidValue
+	}
+	cols, indexes := colNamesAndFieldIndexes(vv.Type().Elem())
+	b.WriteRune('(')
+	for i, c := range cols {
+		p.driver.EscapeIdent(b, c)
+		if i != len(cols)-1 {
+			b.WriteString(", ")
+		}
+	}
+	b.WriteString(") VALUES")
+	for i, length := 0, vv.Len(); i < length; i++ {
+		b.WriteString(" (")
+		vals := valuesByFieldIndexes(vv.Index(i), indexes)
+		for i, v := range vals {
+			p.escapeValue(b, v)
+			if i != len(vals)-1 {
+				b.WriteString(", ")
+			}
+		}
+		b.WriteRune(')')
+		if i != length-1 {
+			b.WriteRune(',')
+		}
+	}
+	return nil
+}
+
+func colNamesAndFieldIndexes(typ reflect.Type) (cols []string, indexes []int) {
+	for i := 0; i < typ.NumField(); i++ {
+		f := typ.Field(i)
+		if f.PkgPath != "" { // Is exported?
+			continue
+		}
+		name := f.Tag.Get("db")
+		if name == "" {
+			name = ToUnderscore(f.Name)
+		} else if name == "-" {
+			continue
+		}
+		cols = append(cols, name)
+		indexes = append(indexes, i)
+	}
+	return
+}
+
+func valuesByFieldIndexes(v reflect.Value, indexes []int) (vals []interface{}) {
+	for _, f := range indexes {
+		vals = append(vals, v.Field(f).Interface())
+	}
+	return
 }
