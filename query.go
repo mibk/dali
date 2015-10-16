@@ -43,15 +43,17 @@ func (q *Query) Rows() (*sql.Rows, error) {
 	return q.execer.Query(sql)
 }
 
-// Row executes a query that is expected to return at most one row.
-// Row always return a non-nil value. Errors are deferred until
-// Row's Scan method is called.
-func (q *Query) Row() *Row {
+// ScanRow executes a query that is expected to return at most one row
+// and copies the columns from the matched row into the values
+// pointed at by dest. If more than one row matches the query,
+// ScanRow uses the first row and discards the rest. If no row matches
+// the query, ScanRow returns sql.ErrNoRows.
+func (q *Query) ScanRow(dest ...interface{}) error {
 	sql, err := q.process()
 	if err != nil {
-		return &Row{err: err}
+		return err
 	}
-	return &Row{Row: q.execer.QueryRow(sql)}
+	return q.execer.QueryRow(sql).Scan(dest...)
 }
 
 func (q *Query) String() string {
@@ -65,21 +67,4 @@ func (q *Query) String() string {
 // process returns a preprocessed SQL query.
 func (q *Query) process() (sql string, err error) {
 	return q.preproc.Process(q.SQL())
-}
-
-// Row is a wrapper around sql.Row.
-type Row struct {
-	*sql.Row
-	err error
-}
-
-// Scan copies the columns from the matched row into the values
-// pointed at by dest.  If more than one row matches the query,
-// Scan uses the first row and discards the rest.  If no row matches
-// the query, Scan returns sql.ErrNoRows.
-func (r *Row) Scan(dest ...interface{}) error {
-	if r.err != nil {
-		return r.err
-	}
-	return r.Row.Scan(dest...)
 }
