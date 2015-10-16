@@ -2,6 +2,7 @@ package dali
 
 import (
 	"database/sql"
+	"reflect"
 	"testing"
 )
 
@@ -18,6 +19,7 @@ func init() {
 		panic(err)
 	}
 	conn = NewConnection(db, dvr)
+	conn.SetMapperFunc(func(s string) string { return s })
 }
 
 func TestScanRow(t *testing.T) {
@@ -37,7 +39,56 @@ func TestScanRow(t *testing.T) {
 	}
 }
 
+func Test_One_and_All(t *testing.T) {
+	tests := []struct {
+		cols     []string
+		result   []interface{}
+		v        interface{} // value to load
+		method   func(q *Query, dest interface{}) error
+		expected interface{}
+	}{
+		{cols("ID"), result(U{1, "John"}, U{2, "Peter"}, U{13, "Carmen"}),
+			newTypeOf([]int64{}), (*Query).All,
+			[]int64{1, 2, 13},
+		},
+		{cols("ID", "Name"), result(U{1, "Alice"}, U{2, "Bob"}, U{13, "Carmen"}),
+			newTypeOf([]U{}), (*Query).All,
+			[]U{{1, "Alice"}, {2, "Bob"}, {13, "Carmen"}},
+		},
+		{cols("ID", "Name"), result(U{1, "Alice"}, U{2, "Bob"}, U{13, "Carmen"}),
+			newTypeOf([]V{}), (*Query).All,
+			[]V{{0, "Alice"}, {0, "Bob"}, {0, "Carmen"}},
+		},
+
+		{cols("ID", "Name"), result(U{1, "Alice"}, U{2, "Bob"}, U{13, "Carmen"}),
+			newTypeOf(U{}), (*Query).One,
+			U{1, "Alice"},
+		},
+	}
+
+	for _, tt := range tests {
+		dvr.SetColumns(tt.cols...).SetResult(tt.result...)
+		if err := tt.method(conn.Query(""), tt.v); err != nil {
+			panic(err)
+		}
+		vv := reflect.ValueOf(tt.v)
+		v := reflect.Indirect(vv).Interface()
+		if !reflect.DeepEqual(v, tt.expected) {
+			t.Errorf("loading:\n got: %v,\nwant: %v", v, tt.expected)
+		}
+	}
+}
+
 type U struct {
 	ID   int64
 	Name string
 }
+
+type V struct {
+	ID   int64 `db:"-"`
+	Name string
+}
+
+func newTypeOf(v interface{}) interface{}   { return reflect.New(reflect.TypeOf(v)).Interface() }
+func cols(s ...string) []string             { return s }
+func result(v ...interface{}) []interface{} { return v }
