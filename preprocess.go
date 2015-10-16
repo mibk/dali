@@ -22,11 +22,12 @@ var (
 )
 
 type Preprocessor struct {
-	driver drivers.Driver
+	driver     drivers.Driver
+	mapperFunc func(string) string
 }
 
 func NewPreprocessor(driver drivers.Driver) *Preprocessor {
-	return &Preprocessor{driver}
+	return &Preprocessor{driver, ToUnderscore}
 }
 
 // Preprocess processes the sql using the driver.
@@ -145,7 +146,7 @@ func (p *Preprocessor) escapeMultipleValues(b *bytes.Buffer, v interface{}) erro
 type Map map[string]interface{}
 
 func (p *Preprocessor) printValuesClause(b *bytes.Buffer, v interface{}) error {
-	cols, vals, err := deriveColsAndVals(v)
+	cols, vals, err := p.deriveColsAndVals(v)
 	if err != nil {
 		return err
 	}
@@ -168,7 +169,7 @@ func (p *Preprocessor) printValuesClause(b *bytes.Buffer, v interface{}) error {
 }
 
 func (p *Preprocessor) printSetClause(b *bytes.Buffer, v interface{}) error {
-	cols, vals, err := deriveColsAndVals(v)
+	cols, vals, err := p.deriveColsAndVals(v)
 	if err != nil {
 		return err
 	}
@@ -187,7 +188,7 @@ func (p *Preprocessor) printSetClause(b *bytes.Buffer, v interface{}) error {
 
 // deriveColsAndVals derives column names from an underlying type of v and returns
 // them together with the corresponding values.
-func deriveColsAndVals(v interface{}) (cols []string, vals []interface{}, err error) {
+func (p *Preprocessor) deriveColsAndVals(v interface{}) (cols []string, vals []interface{}, err error) {
 	switch v := v.(type) {
 	case Map:
 		for k, v := range v {
@@ -203,7 +204,7 @@ func deriveColsAndVals(v interface{}) (cols []string, vals []interface{}, err er
 			return nil, nil, ErrInvalidValue
 		}
 		var indexes []int
-		cols, indexes = colNamesAndFieldIndexes(vv.Type())
+		cols, indexes = p.colNamesAndFieldIndexes(vv.Type())
 		vals = valuesByFieldIndexes(vv, indexes)
 
 	}
@@ -224,7 +225,7 @@ func (p *Preprocessor) printMultiValuesClause(b *bytes.Buffer, v interface{}) er
 	if el.Kind() != reflect.Struct {
 		return ErrInvalidValue
 	}
-	cols, indexes := colNamesAndFieldIndexes(el)
+	cols, indexes := p.colNamesAndFieldIndexes(el)
 	b.WriteRune('(')
 	for i, c := range cols {
 		p.driver.EscapeIdent(b, c)
@@ -256,7 +257,7 @@ func (p *Preprocessor) printMultiValuesClause(b *bytes.Buffer, v interface{}) er
 
 // colNamesAndFieldIndexes derives column names from a struct type and returns
 // them together with the indexes of used fields. typ must by a struct type.
-func colNamesAndFieldIndexes(typ reflect.Type) (cols []string, indexes []int) {
+func (p *Preprocessor) colNamesAndFieldIndexes(typ reflect.Type) (cols []string, indexes []int) {
 	for i := 0; i < typ.NumField(); i++ {
 		f := typ.Field(i)
 		if f.PkgPath != "" { // Is exported?
@@ -264,7 +265,7 @@ func colNamesAndFieldIndexes(typ reflect.Type) (cols []string, indexes []int) {
 		}
 		name := f.Tag.Get("db")
 		if name == "" {
-			name = ToUnderscore(f.Name)
+			name = p.mapperFunc(f.Name)
 		} else if name == "-" {
 			continue
 		}
@@ -279,4 +280,8 @@ func valuesByFieldIndexes(v reflect.Value, indexes []int) (vals []interface{}) {
 		vals = append(vals, v.Field(f).Interface())
 	}
 	return
+}
+
+func (p *Preprocessor) setMapperFunc(f func(string) string) {
+	p.mapperFunc = f
 }

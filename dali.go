@@ -75,6 +75,13 @@ func (c *Connection) Query(query string, args ...interface{}) *Query {
 	}
 }
 
+// SetMapperFunc sets a mapper func which is used when deriving
+// column names from field names. It none is set, the dali.ToUnderscore
+// func is used.
+func (c *Connection) SetMapperFunc(f func(string) string) {
+	c.preproc.setMapperFunc(f)
+}
+
 type execer interface {
 	Exec(query string, args ...interface{}) (sql.Result, error)
 	Query(query string, args ...interface{}) (*sql.Rows, error)
