@@ -33,8 +33,7 @@ func (q *Query) MustExec() sql.Result {
 	return res
 }
 
-// Query executes a query that returns rows, typically a SELECT.
-// The args are for any placeholder parameters in the query.
+// Rows executes a query that returns rows, typically a SELECT.
 func (q *Query) Rows() (*sql.Rows, error) {
 	sql, err := q.process()
 	if err != nil {
