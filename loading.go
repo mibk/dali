@@ -39,21 +39,28 @@ func (q *Query) All(dest interface{}) error {
 	}
 
 	elemt := slicev.Type().Elem()
+	origint := elemt
+	isPtr := false
+	if isPtr = elemt.Kind() == reflect.Ptr; isPtr {
+		elemt = elemt.Elem()
+	}
 	switch elemt.Kind() {
+	case reflect.Ptr:
+		panic("dali: a pointer to a pointer is not allowed as an element of a slice")
 	case reflect.Struct:
-		return q.loadStructs(slicev, elemt)
+		return q.loadStructs(slicev, elemt, isPtr)
 	default:
-		return q.loadValues(slicev, elemt)
+		return q.loadValues(slicev, origint)
 	}
 }
 
-func (q *Query) loadStruct(v reflect.Value) error { return q.load(v, v.Type(), true) }
+func (q *Query) loadStruct(v reflect.Value) error { return q.load(v, v.Type(), true, false) }
 
-func (q *Query) loadStructs(slicev reflect.Value, elemt reflect.Type) error {
-	return q.load(slicev, elemt, false)
+func (q *Query) loadStructs(slicev reflect.Value, elemt reflect.Type, isPtr bool) error {
+	return q.load(slicev, elemt, false, isPtr)
 }
 
-func (q *Query) load(v reflect.Value, elemt reflect.Type, loadJustOne bool) error {
+func (q *Query) load(v reflect.Value, elemt reflect.Type, loadJustOne, isPtr bool) error {
 	rows, err := q.Rows()
 	if err != nil {
 		return err
@@ -96,9 +103,12 @@ func (q *Query) load(v reflect.Value, elemt reflect.Type, loadJustOne bool) erro
 			// v must is a struct.
 			v.Set(elemv)
 			break
+			// Otherwise, v must be a slice.
+		} else if isPtr {
+			v.Set(reflect.Append(v, elemvptr))
+		} else {
+			v.Set(reflect.Append(v, elemv))
 		}
-		// Otherwise, v must be a slice.
-		v.Set(reflect.Append(v, elemv))
 	}
 	return rows.Err()
 }
