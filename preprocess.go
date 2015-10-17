@@ -13,13 +13,8 @@ import (
 	"github.com/mibk/dali/drivers"
 )
 
-var (
-	ErrArgumentMismatch   = errors.New("mismatch between placeholders and arguments")
-	ErrInvalidSyntax      = errors.New("SQL syntax error")
-	ErrInvalidValue       = errors.New("trying to interpolate invalid value")
-	ErrInvalidPlaceholder = errors.New("invalid placeholder")
-	ErrNotUTF8            = errors.New("invalid UTF-8")
-)
+// ErrNotUTF8 is returned when a string argument is not a valid UTF-8 string.
+var ErrNotUTF8 = errors.New("dali: argument is not a valid UTF-8 string")
 
 type Preprocessor struct {
 	driver     drivers.Driver
@@ -43,7 +38,7 @@ func (p *Preprocessor) Process(sql string, args []interface{}) (string, error) {
 		case '[':
 			w := strings.IndexRune(sql[pos:], ']')
 			if w == -1 {
-				return "", ErrInvalidSyntax
+				return "", fmt.Errorf("dali: identifier not terminated")
 			}
 			col := sql[pos : pos+w]
 			p.driver.EscapeIdent(b, col)
@@ -58,7 +53,7 @@ func (p *Preprocessor) Process(sql string, args []interface{}) (string, error) {
 				pos += w
 			}
 			if argIndex >= len(args) {
-				return "", ErrArgumentMismatch
+				return "", fmt.Errorf("dali: there is not enough args for placeholders")
 			}
 			if err := p.interpolate(b, sql[start:pos], args[argIndex]); err != nil {
 				return "", err
@@ -68,7 +63,9 @@ func (p *Preprocessor) Process(sql string, args []interface{}) (string, error) {
 			b.WriteRune(r)
 		}
 	}
-
+	if argIndex < len(args) {
+		return "", fmt.Errorf("dali: only %d args are expected", argIndex)
+	}
 	return b.String(), nil
 }
 
@@ -81,7 +78,7 @@ func (p *Preprocessor) interpolate(b *bytes.Buffer, typ string, v interface{}) e
 	case "ident":
 		col, ok := v.(string)
 		if !ok {
-			return ErrInvalidValue
+			return fmt.Errorf("dali: ?ident expects the argument to be a string")
 		}
 		p.driver.EscapeIdent(b, col)
 	case "values":
@@ -91,7 +88,7 @@ func (p *Preprocessor) interpolate(b *bytes.Buffer, typ string, v interface{}) e
 	case "set":
 		return p.printSetClause(b, v)
 	default:
-		return fmt.Errorf("invalid placeholder: %s", typ)
+		return fmt.Errorf("dali: unknown placeholder ?%s", typ)
 	}
 	return nil
 }
@@ -120,7 +117,7 @@ func (p *Preprocessor) escapeValue(b *bytes.Buffer, v interface{}) error {
 		}
 		p.driver.EscapeString(b, s)
 	default:
-		return ErrInvalidValue
+		return fmt.Errorf("dali: invalid argument type: %s", vv.Kind())
 	}
 	return nil
 }
@@ -128,7 +125,7 @@ func (p *Preprocessor) escapeValue(b *bytes.Buffer, v interface{}) error {
 func (p *Preprocessor) escapeMultipleValues(b *bytes.Buffer, v interface{}) error {
 	vv := reflect.ValueOf(v)
 	if vv.Kind() != reflect.Slice {
-		return ErrInvalidValue
+		return fmt.Errorf("dali: ?... expects the argument to be a slice")
 	}
 	length := vv.Len()
 	for i := 0; i < length; i++ {
@@ -201,7 +198,7 @@ func (p *Preprocessor) deriveColsAndVals(v interface{}) (cols []string, vals []i
 			vv = reflect.Indirect(vv)
 		}
 		if vv.Kind() != reflect.Struct {
-			return nil, nil, ErrInvalidValue
+			return nil, nil, fmt.Errorf("dali: argument must be a pointer to a struct")
 		}
 		var indexes [][]int
 		cols, indexes = p.colNamesAndFieldIndexes(vv.Type())
@@ -212,9 +209,10 @@ func (p *Preprocessor) deriveColsAndVals(v interface{}) (cols []string, vals []i
 }
 
 func (p *Preprocessor) printMultiValuesClause(b *bytes.Buffer, v interface{}) error {
+	errInvalidArg := fmt.Errorf("dali: ?values... expects the argument to be a slice of structs")
 	vv := reflect.ValueOf(v)
 	if vv.Kind() != reflect.Slice {
-		return ErrInvalidValue
+		return errInvalidArg
 	}
 	el := vv.Type().Elem()
 	isPtr := false
@@ -223,7 +221,7 @@ func (p *Preprocessor) printMultiValuesClause(b *bytes.Buffer, v interface{}) er
 		isPtr = true
 	}
 	if el.Kind() != reflect.Struct {
-		return ErrInvalidValue
+		return errInvalidArg
 	}
 	cols, indexes := p.colNamesAndFieldIndexes(el)
 	b.WriteRune('(')
