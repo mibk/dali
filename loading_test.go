@@ -69,6 +69,12 @@ func Test_One_and_All(t *testing.T) {
 			newTypeOf(U{}), (*Query).One,
 			U{1, "Thomas"},
 		},
+
+		// embedded structs
+		{cols("ID", "First", "Last"), result(Eres{1, "Thomas", "Shoe"}, Eres{4, "Bob", "Webber"}),
+			newTypeOf([]E{}), (*Query).All,
+			[]E{{1, Name{"Thomas", "Shoe"}}, {4, Name{"Bob", "Webber"}}},
+		},
 	}
 
 	for _, tt := range tests {
@@ -94,6 +100,22 @@ func (u *U) String() string { return fmt.Sprintf("&%v", *u) }
 type V struct {
 	ID   int64 `db:"-"`
 	Name string
+}
+
+type E struct {
+	ID   int64
+	Name Name
+}
+
+type Name struct {
+	First string
+	Last  string
+}
+
+type Eres struct {
+	ID    int64
+	First string
+	Last  string
 }
 
 func newTypeOf(v interface{}) interface{}   { return reflect.New(reflect.TypeOf(v)).Interface() }

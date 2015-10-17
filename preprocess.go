@@ -203,7 +203,7 @@ func (p *Preprocessor) deriveColsAndVals(v interface{}) (cols []string, vals []i
 		if vv.Kind() != reflect.Struct {
 			return nil, nil, ErrInvalidValue
 		}
-		var indexes []int
+		var indexes [][]int
 		cols, indexes = p.colNamesAndFieldIndexes(vv.Type())
 		vals = valuesByFieldIndexes(vv, indexes)
 
@@ -257,10 +257,23 @@ func (p *Preprocessor) printMultiValuesClause(b *bytes.Buffer, v interface{}) er
 
 // colNamesAndFieldIndexes derives column names from a struct type and returns
 // them together with the indexes of used fields. typ must by a struct type.
-func (p *Preprocessor) colNamesAndFieldIndexes(typ reflect.Type) (cols []string, indexes []int) {
+func (p *Preprocessor) colNamesAndFieldIndexes(typ reflect.Type) (cols []string, indexes [][]int) {
+	return p.colNamesAndFieldIndexesOfEmbedded(typ, []int{})
+}
+
+func (p *Preprocessor) colNamesAndFieldIndexesOfEmbedded(typ reflect.Type, index []int) (
+	cols []string, indexes [][]int) {
+
 	for i := 0; i < typ.NumField(); i++ {
 		f := typ.Field(i)
-		if f.PkgPath != "" { // Is exported?
+		if f.PkgPath != "" { // Is unexported?
+			continue
+		}
+		if f.Type.Kind() == reflect.Struct {
+			emCols, emIndexes := p.colNamesAndFieldIndexesOfEmbedded(f.Type,
+				append(index, i))
+			cols = append(cols, emCols...)
+			indexes = append(indexes, emIndexes...)
 			continue
 		}
 		name := f.Tag.Get("db")
@@ -270,14 +283,14 @@ func (p *Preprocessor) colNamesAndFieldIndexes(typ reflect.Type) (cols []string,
 			continue
 		}
 		cols = append(cols, name)
-		indexes = append(indexes, i)
+		indexes = append(indexes, append(index, i))
 	}
 	return
 }
 
-func valuesByFieldIndexes(v reflect.Value, indexes []int) (vals []interface{}) {
-	for _, f := range indexes {
-		vals = append(vals, v.Field(f).Interface())
+func valuesByFieldIndexes(v reflect.Value, indexes [][]int) (vals []interface{}) {
+	for _, index := range indexes {
+		vals = append(vals, v.FieldByIndex(index).Interface())
 	}
 	return
 }

@@ -72,16 +72,16 @@ func (q *Query) load(v reflect.Value, elemt reflect.Type, loadJustOne, isPtr boo
 		return err
 	}
 	cols, indexes := q.preproc.colNamesAndFieldIndexes(elemt)
-	fieldIndexes := make([]int, 0, len(rowCols))
-	for _, rowCol := range rowCols {
-		index := -1
+	fieldIndexes := make([][]int, len(rowCols))
+	for coln, rowCol := range rowCols {
+		var index []int
 		for i, col := range cols {
 			if rowCol == col {
 				index = indexes[i]
 				break
 			}
 		}
-		fieldIndexes = append(fieldIndexes, index)
+		fieldIndexes[coln] = index
 	}
 	fields := make([]interface{}, len(fieldIndexes))
 
@@ -89,12 +89,12 @@ func (q *Query) load(v reflect.Value, elemt reflect.Type, loadJustOne, isPtr boo
 		elemvptr := reflect.New(elemt)
 		elemv := reflect.Indirect(elemvptr)
 
-		for i, fi := range fieldIndexes {
-			if fi == -1 {
+		for i, index := range fieldIndexes {
+			if index == nil {
 				fields[i] = &ignoreField
 				continue
 			}
-			fields[i] = elemv.Field(fi).Addr().Interface()
+			fields[i] = elemv.FieldByIndex(index).Addr().Interface()
 		}
 		if err := rows.Scan(fields...); err != nil {
 			return err

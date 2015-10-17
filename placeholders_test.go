@@ -33,6 +33,10 @@ var placeholderTests = []struct {
 		"", ErrInvalidValue},
 	{"INSERT ?values...", Args{[]**User{}},
 		"", ErrInvalidValue},
+
+	// embedded structs
+	{"INSERT ?values", Args{E{1, Name{"John", "Doe"}}},
+		"INSERT ({id}, {first}, {last}) VALUES (1, 'John', 'Doe')", nil},
 }
 
 func TestPlaceholders(t *testing.T) {
