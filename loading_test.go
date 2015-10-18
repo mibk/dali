@@ -60,7 +60,9 @@ func Test_One_and_All(t *testing.T) {
 			newTypeOf([]*U{}), (*Query).All,
 			[]*U{{1, "Alice"}, {2, "Bob"}, {13, "Carmen"}},
 		},
-		{cols("ID", "Name"), result(U{1, "Justin"}, U{2, "Martin"}, U{13, "Lis"}),
+
+		// column names from field tags
+		{cols("ID", "V_name"), result(Vres{1, "Justin"}, Vres{2, "Martin"}, Vres{13, "Lis"}),
 			newTypeOf([]V{}), (*Query).All,
 			[]V{{0, "Justin"}, {0, "Martin"}, {0, "Lis"}},
 		},
@@ -74,6 +76,16 @@ func Test_One_and_All(t *testing.T) {
 		{cols("ID", "First", "Last"), result(Eres{1, "Thomas", "Shoe"}, Eres{4, "Bob", "Webber"}),
 			newTypeOf([]E{}), (*Query).All,
 			[]E{{1, Name{"Thomas", "Shoe"}}, {4, Name{"Bob", "Webber"}}},
+		},
+
+		// ,omitinsert
+		{cols("ID", "Name", "Age"), result(Omit{1, "Barbora", 19}, Omit{4, "Bob", 23}),
+			newTypeOf([]Omit{}), (*Query).All,
+			[]Omit{{1, "Barbora", 19}, {4, "Bob", 23}},
+		},
+		{cols("Id_user", "Name", "Age"), result(Omit2res{1, "Hubert", 32}, Omit2res{4, "Bob", 23}),
+			newTypeOf([]Omit2{}), (*Query).All,
+			[]Omit2{{1, "Hubert", 32}, {4, "Bob", 23}},
 		},
 	}
 
@@ -98,8 +110,13 @@ type U struct {
 func (u *U) String() string { return fmt.Sprintf("&%v", *u) }
 
 type V struct {
-	ID   int64 `db:"-"`
-	Name string
+	ID   int64  `db:"-"`
+	Name string `db:"V_name"`
+}
+
+type Vres struct {
+	ID     int64
+	V_name string
 }
 
 type E struct {

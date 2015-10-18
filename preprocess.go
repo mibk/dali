@@ -201,7 +201,7 @@ func (p *Preprocessor) deriveColsAndVals(v interface{}) (cols []string, vals []i
 			return nil, nil, fmt.Errorf("dali: argument must be a pointer to a struct")
 		}
 		var indexes [][]int
-		cols, indexes = p.colNamesAndFieldIndexes(vv.Type())
+		cols, indexes = p.colNamesAndFieldIndexes(vv.Type(), true)
 		vals = valuesByFieldIndexes(vv, indexes)
 
 	}
@@ -223,7 +223,7 @@ func (p *Preprocessor) printMultiValuesClause(b *bytes.Buffer, v interface{}) er
 	if el.Kind() != reflect.Struct {
 		return errInvalidArg
 	}
-	cols, indexes := p.colNamesAndFieldIndexes(el)
+	cols, indexes := p.colNamesAndFieldIndexes(el, true)
 	b.WriteRune('(')
 	for i, c := range cols {
 		p.driver.EscapeIdent(b, c)
@@ -254,12 +254,15 @@ func (p *Preprocessor) printMultiValuesClause(b *bytes.Buffer, v interface{}) er
 }
 
 // colNamesAndFieldIndexes derives column names from a struct type and returns
-// them together with the indexes of used fields. typ must by a struct type.
-func (p *Preprocessor) colNamesAndFieldIndexes(typ reflect.Type) (cols []string, indexes [][]int) {
-	return p.colNamesAndFieldIndexesOfEmbedded(typ, []int{})
+// them together with the indexes of used fields. typ must be a struct type.
+// If the tag name equals "-", the field is ignored. If omitInsert is true,
+// fields having the omitinsert property are ignored as well.
+func (p *Preprocessor) colNamesAndFieldIndexes(typ reflect.Type, omitInsert bool) (
+	cols []string, indexes [][]int) {
+	return p.colNamesAndFieldIndexesOfEmbedded(typ, []int{}, omitInsert)
 }
 
-func (p *Preprocessor) colNamesAndFieldIndexesOfEmbedded(typ reflect.Type, index []int) (
+func (p *Preprocessor) colNamesAndFieldIndexesOfEmbedded(typ reflect.Type, index []int, omitInsert bool) (
 	cols []string, indexes [][]int) {
 
 	for i := 0; i < typ.NumField(); i++ {
@@ -269,21 +272,43 @@ func (p *Preprocessor) colNamesAndFieldIndexesOfEmbedded(typ reflect.Type, index
 		}
 		if f.Type.Kind() == reflect.Struct {
 			emCols, emIndexes := p.colNamesAndFieldIndexesOfEmbedded(f.Type,
-				append(index, i))
+				append(index, i), omitInsert)
 			cols = append(cols, emCols...)
 			indexes = append(indexes, emIndexes...)
 			continue
 		}
-		name := f.Tag.Get("db")
-		if name == "" {
-			name = p.mapperFunc(f.Name)
-		} else if name == "-" {
+		prop := parseFieldProp(f.Tag.Get("db"))
+		if prop.Ignore || omitInsert && prop.OmitInsert {
 			continue
 		}
-		cols = append(cols, name)
+		if prop.Col == "" {
+			prop.Col = p.mapperFunc(f.Name)
+		}
+		cols = append(cols, prop.Col)
 		indexes = append(indexes, append(index, i))
 	}
 	return
+}
+
+type fieldProp struct {
+	Col        string
+	OmitInsert bool
+	Ignore     bool
+}
+
+func parseFieldProp(s string) fieldProp {
+	props := strings.Split(s, ",")
+	if props[0] == "-" {
+		return fieldProp{Ignore: true}
+	}
+	p := fieldProp{Col: props[0]}
+	for _, prop := range props[1:] {
+		switch prop {
+		case "omitinsert":
+			p.OmitInsert = true
+		}
+	}
+	return p
 }
 
 func valuesByFieldIndexes(v reflect.Value, indexes [][]int) (vals []interface{}) {

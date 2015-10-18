@@ -85,7 +85,12 @@ func (r *FakeRows) Next(dest []driver.Value) error {
 		panic("fake driver: dest len and column count must match")
 	}
 	for i, col := range cols {
-		dest[i] = rowv.FieldByName(col).Interface()
+		v := rowv.FieldByName(col)
+		if !v.IsValid() {
+			panic(fmt.Sprintf("field %s is not contained in %s struct",
+				col, rowv.Type().Name()))
+		}
+		dest[i] = v.Interface()
 	}
 	return nil
 }
