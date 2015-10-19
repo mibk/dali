@@ -2,6 +2,8 @@ package dali
 
 import (
 	"database/sql"
+	"database/sql/driver"
+	"strings"
 	"testing"
 	"time"
 )
@@ -35,9 +37,21 @@ var placeholderTests = []struct {
 	{"INSERT ?values", Args{V{1, "Syd"}},
 		"INSERT ({V_name}) VALUES ('Syd')"},
 
-	// embedded structs
+	// nested structs
 	{"INSERT ?values", Args{E{1, Name{"John", "Doe"}}},
 		"INSERT ({id}, {first}, {last}) VALUES (1, 'John', 'Doe')"},
+
+	// ignored nested structs
+	{"?values", Args{SpecialStruct{"Waking up", parseTime("2015-04-05 06:07:08"), NullTime{}}},
+		"({event}, {started}, {finished}) VALUES ('Waking up', " +
+			"'2015-04-05 06:07:08 +0000 UTC', NULL)"},
+	{"?values", Args{SpecialStruct{"Waking up", parseTime("2015-04-05 06:07:08"),
+		NullTime{parseTime("2015-04-05 06:38:15"), true}}},
+		"({event}, {started}, {finished}) VALUES ('Waking up', " +
+			"'2015-04-05 06:07:08 +0000 UTC', '2015-04-05 06:38:15 +0000 UTC')"},
+
+	// ignore valuer but not scanner
+	{"?values", Args{VS{Val{2, 3}, Scan{"A", "B"}}}, "({val}, {a}, {b}) VALUES (5, 'A', 'B')"},
 
 	// ,omitinsert
 	{"INSERT ?values", Args{Omit{Name: "John", Age: 21}},
@@ -85,6 +99,49 @@ type Omit2res struct {
 	Age     int
 }
 
+type SpecialStruct struct {
+	Event    string
+	Started  time.Time
+	Finished NullTime
+}
+
+type SpecialStructRes struct {
+	Event    string
+	Started  time.Time
+	Finished interface{}
+}
+
+type Val struct {
+	A int
+	B int
+}
+
+func (v Val) Value() (driver.Value, error) { return v.A + v.B, nil }
+
+type Scan struct {
+	A string
+	B string
+}
+
+var _ sql.Scanner = new(Scan)
+
+func (s *Scan) Scan(v interface{}) error {
+	if v, ok := v.(string); ok {
+		str := strings.Split(v, ":")
+		if len(str) != 2 {
+			panic("v should contain just one colon (:)")
+		}
+		s.A, s.B = str[0], str[1]
+		return nil
+	}
+	panic("v is not string")
+}
+
+type VS struct {
+	Val  Val
+	Scan Scan
+}
+
 var errorTests = []struct {
 	sql  string
 	args []interface{}
@@ -118,7 +175,15 @@ func TestErrors(t *testing.T) {
 
 const sqlTimeFmt = "2006-01-02 15:04:05"
 
-var sometime, _ = time.Parse(sqlTimeFmt, "2015-03-05 10:42:43")
+func parseTime(s string) time.Time {
+	t, err := time.Parse(sqlTimeFmt, s)
+	if err != nil {
+		panic(err)
+	}
+	return t
+}
+
+var sometime = parseTime("2015-03-05 10:42:43")
 
 var typesTests = []struct {
 	sql    string

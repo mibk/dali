@@ -73,11 +73,26 @@ func Test_One_and_All(t *testing.T) {
 			U{1, "Thomas"},
 		},
 
-		// embedded structs
+		// nested structs
 		{cols("ID", "First", "Last"), result(Eres{1, "Thomas", "Shoe"}, Eres{4, "Bob", "Webber"}),
 			newTypeOf([]E{}), (*Query).All,
 			[]E{{1, Name{"Thomas", "Shoe"}}, {4, Name{"Bob", "Webber"}}},
 		},
+
+		// ignored nested structs
+		{cols("Event", "Started", "Finished"), result(SpecialStructRes{"Lunch",
+			parseTime("2015-05-05 12:24:32"), nil}),
+			newTypeOf(SpecialStruct{}), (*Query).One,
+			SpecialStruct{"Lunch", parseTime("2015-05-05 12:24:32"), NullTime{}}},
+		{cols("Event", "Started", "Finished"), result(SpecialStructRes{"Lunch",
+			parseTime("2015-05-05 12:24:32"), parseTime("2015-05-05 13:08:17")}),
+			newTypeOf(SpecialStruct{}), (*Query).One,
+			SpecialStruct{"Lunch", parseTime("2015-05-05 12:24:32"),
+				NullTime{parseTime("2015-05-05 13:08:17"), true}}},
+
+		// ignore scanner but not valuer
+		{cols("A", "B", "Scan"), result(VSres{2, 3, "group:name"}),
+			newTypeOf(VS{}), (*Query).One, VS{Val{2, 3}, Scan{"group", "name"}}},
 
 		// ,omitinsert
 		{cols("ID", "Name", "Age"), result(Omit{1, "Barbora", 19}, Omit{4, "Bob", 23}),
@@ -134,6 +149,12 @@ type Eres struct {
 	ID    int64
 	First string
 	Last  string
+}
+
+type VSres struct {
+	A    int
+	B    int
+	Scan string
 }
 
 func TestLoading_Types(t *testing.T) {

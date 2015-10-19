@@ -2,6 +2,7 @@ package dali
 
 import (
 	"bytes"
+	"database/sql"
 	"database/sql/driver"
 	"errors"
 	"fmt"
@@ -293,14 +294,14 @@ func (p *Preprocessor) printMultiValuesClause(b *bytes.Buffer, v interface{}) er
 
 // colNamesAndFieldIndexes derives column names from a struct type and returns
 // them together with the indexes of used fields. typ must be a struct type.
-// If the tag name equals "-", the field is ignored. If omitInsert is true,
+// If the tag name equals "-", the field is ignored. If insert is true,
 // fields having the omitinsert property are ignored as well.
-func (p *Preprocessor) colNamesAndFieldIndexes(typ reflect.Type, omitInsert bool) (
+func (p *Preprocessor) colNamesAndFieldIndexes(typ reflect.Type, insert bool) (
 	cols []string, indexes [][]int) {
-	return p.colNamesAndFieldIndexesOfEmbedded(typ, []int{}, omitInsert)
+	return p.colNamesAndFieldIndexesOfNested(typ, []int{}, insert)
 }
 
-func (p *Preprocessor) colNamesAndFieldIndexesOfEmbedded(typ reflect.Type, index []int, omitInsert bool) (
+func (p *Preprocessor) colNamesAndFieldIndexesOfNested(typ reflect.Type, index []int, insert bool) (
 	cols []string, indexes [][]int) {
 
 	for i := 0; i < typ.NumField(); i++ {
@@ -309,14 +310,24 @@ func (p *Preprocessor) colNamesAndFieldIndexesOfEmbedded(typ reflect.Type, index
 			continue
 		}
 		if f.Type.Kind() == reflect.Struct {
-			emCols, emIndexes := p.colNamesAndFieldIndexesOfEmbedded(f.Type,
-				append(index, i), omitInsert)
-			cols = append(cols, emCols...)
-			indexes = append(indexes, emIndexes...)
-			continue
+			switch {
+			case f.Type.ConvertibleTo(reflect.TypeOf(time.Time{})):
+				break
+			case insert && f.Type.Implements(valuerInterface):
+				break
+			case !insert && (f.Type.Implements(scannerInterface) ||
+				reflect.PtrTo(f.Type).Implements(scannerInterface)):
+				break
+			default:
+				emCols, emIndexes := p.colNamesAndFieldIndexesOfNested(f.Type,
+					append(index, i), insert)
+				cols = append(cols, emCols...)
+				indexes = append(indexes, emIndexes...)
+				continue
+			}
 		}
 		prop := parseFieldProp(f.Tag.Get("db"))
-		if prop.Ignore || omitInsert && prop.OmitInsert {
+		if prop.Ignore || insert && prop.OmitInsert {
 			continue
 		}
 		if prop.Col == "" {
@@ -327,6 +338,11 @@ func (p *Preprocessor) colNamesAndFieldIndexesOfEmbedded(typ reflect.Type, index
 	}
 	return
 }
+
+var (
+	valuerInterface  = reflect.TypeOf((*driver.Valuer)(nil)).Elem()
+	scannerInterface = reflect.TypeOf((*sql.Scanner)(nil)).Elem()
+)
 
 type fieldProp struct {
 	Col        string
