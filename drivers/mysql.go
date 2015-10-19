@@ -24,9 +24,18 @@ func (MySQL) EscapeBool(w io.Writer, v bool) {
 }
 
 func (MySQL) EscapeString(w io.Writer, s string) {
+	escapeBytes(w, []byte(s))
+}
+
+func (MySQL) EscapeBytes(w io.Writer, b []byte) {
+	writeString(w, "_binary")
+	escapeBytes(w, b)
+}
+
+func escapeBytes(w io.Writer, bytes []byte) {
 	writeRune(w, '\'')
-	for _, r := range []rune(s) {
-		switch r {
+	for _, b := range bytes {
+		switch b {
 		case '\'':
 			writeString(w, `\'`)
 		case '"':
@@ -39,10 +48,10 @@ func (MySQL) EscapeString(w io.Writer, s string) {
 			writeString(w, `\r`)
 		case 0:
 			writeString(w, `\x00`)
-		case 0x1a:
+		case 0x1A:
 			writeString(w, `\x1a`)
 		default:
-			writeRune(w, r)
+			writeRune(w, rune(b))
 		}
 	}
 	writeRune(w, '\'')

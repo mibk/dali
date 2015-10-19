@@ -105,31 +105,60 @@ func (p *Preprocessor) escapeValue(b *bytes.Buffer, v interface{}) error {
 		b.WriteString("NULL")
 		return nil
 	}
-	vv := reflect.ValueOf(v)
-	switch vv.Kind() {
-	case reflect.Bool:
-		p.driver.EscapeBool(b, vv.Bool())
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		b.WriteString(strconv.FormatInt(vv.Int(), 10))
-	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		b.WriteString(strconv.FormatUint(vv.Uint(), 10))
-	case reflect.Float32, reflect.Float64:
-		b.WriteString(strconv.FormatFloat(vv.Float(), 'f', -1, 64))
-	case reflect.String:
-		s := vv.String()
-		if !utf8.ValidString(s) {
+	switch v := v.(type) {
+	case bool:
+		p.driver.EscapeBool(b, v)
+
+	// signed integers
+	case int:
+		formatInt(b, int64(v))
+	case int8:
+		formatInt(b, int64(v))
+	case int16:
+		formatInt(b, int64(v))
+	case int32:
+		formatInt(b, int64(v))
+	case int64:
+		formatInt(b, v)
+
+	// unsigned integers
+	case uint:
+		formatUint(b, uint64(v))
+	case uint8:
+		formatUint(b, uint64(v))
+	case uint16:
+		formatUint(b, uint64(v))
+	case uint32:
+		formatUint(b, uint64(v))
+	case uint64:
+		formatUint(b, v)
+
+	// floats
+	case float32:
+		formatFloat(b, float64(v))
+	case float64:
+		formatFloat(b, v)
+
+	case string:
+		if !utf8.ValidString(v) {
 			return ErrNotUTF8
 		}
-		p.driver.EscapeString(b, s)
+		p.driver.EscapeString(b, v)
+
+	case []byte:
+		p.driver.EscapeBytes(b, v)
+
+	case time.Time:
+		p.driver.EscapeTime(b, v)
 	default:
-		if t, ok := v.(time.Time); ok {
-			p.driver.EscapeTime(b, t)
-			return nil
-		}
-		return fmt.Errorf("dali: invalid argument type: %s", vv.Kind())
+		return fmt.Errorf("dali: invalid argument type: %T", v)
 	}
 	return nil
 }
+
+func formatInt(b *bytes.Buffer, i int64)     { b.WriteString(strconv.FormatInt(i, 10)) }
+func formatUint(b *bytes.Buffer, u uint64)   { b.WriteString(strconv.FormatUint(u, 10)) }
+func formatFloat(b *bytes.Buffer, f float64) { b.WriteString(strconv.FormatFloat(f, 'f', -1, 64)) }
 
 func (p *Preprocessor) escapeMultipleValues(b *bytes.Buffer, v interface{}) error {
 	vv := reflect.ValueOf(v)

@@ -95,7 +95,7 @@ var errorTests = []struct {
 	{"SELECT ?, ?", Args{3, 4, 5}, "dali: only 2 args are expected"},
 	{"INSERT INTO ?ident", Args{5}, "dali: ?ident expects the argument to be a string"},
 	{"INSERT INTO ?u", Args{5}, "dali: unknown placeholder ?u"},
-	{"INSERT INTO ?", Args{func() {}}, "dali: invalid argument type: func"},
+	{"INSERT INTO ?", Args{func() {}}, "dali: invalid argument type: func()"},
 	{"WHERE IN ?...", Args{14}, "dali: ?... expects the argument to be a slice"},
 	{"INSERT ?values", Args{ptrPtrUser()}, "dali: argument must be a pointer to a struct"},
 	{"INSERT ?values...", Args{[]**User{}},
@@ -133,6 +133,7 @@ var typesTests = []struct {
 	{"?, ?", Args{float32(1.5), float64(2.71828)}, "1.5, 2.71828"},
 	{"?", Args{"příliš žluťoučký kůň úpěl ďábelské ódy"},
 		"'příliš žluťoučký kůň úpěl ďábelské ódy'"},
+	{"?", Args{[]byte("binary text")}, "`binary text`"},
 	{"?", Args{sometime}, "'2015-03-05 10:42:43 +0000 UTC'"},
 
 	// NULL
