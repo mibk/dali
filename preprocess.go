@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/mibk/dali/drivers"
@@ -100,6 +101,10 @@ func (p *Preprocessor) escapeValue(b *bytes.Buffer, v interface{}) error {
 			return err
 		}
 	}
+	if v == nil {
+		b.WriteString("NULL")
+		return nil
+	}
 	vv := reflect.ValueOf(v)
 	switch vv.Kind() {
 	case reflect.Bool:
@@ -117,6 +122,10 @@ func (p *Preprocessor) escapeValue(b *bytes.Buffer, v interface{}) error {
 		}
 		p.driver.EscapeString(b, s)
 	default:
+		if t, ok := v.(time.Time); ok {
+			p.driver.EscapeTime(b, t)
+			return nil
+		}
 		return fmt.Errorf("dali: invalid argument type: %s", vv.Kind())
 	}
 	return nil

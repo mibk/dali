@@ -1,6 +1,10 @@
 package dali
 
-import "testing"
+import (
+	"database/sql"
+	"testing"
+	"time"
+)
 
 var placeholderTests = []struct {
 	sql    string
@@ -108,6 +112,44 @@ func TestErrors(t *testing.T) {
 		}
 		if err.Error() != tt.err {
 			t.Errorf("%s:\n got: %v,\nwant: %v", tt.sql, err, tt.err)
+		}
+	}
+}
+
+const sqlTimeFmt = "2006-01-02 15:04:05"
+
+var sometime, _ = time.Parse(sqlTimeFmt, "2015-03-05 10:42:43")
+
+var typesTests = []struct {
+	sql    string
+	args   []interface{}
+	expSQL string
+}{
+	{"?, ?", Args{true, false}, "true, false"},
+	{"?, ?, ?, ?, ?", Args{int(-1), int8(-2), int16(-3), int32(-4), int64(-5)},
+		"-1, -2, -3, -4, -5"},
+	{"?, ?, ?, ?, ?", Args{uint(1), uint8(2), uint16(3), uint32(4), uint64(5)},
+		"1, 2, 3, 4, 5"},
+	{"?, ?", Args{float32(1.5), float64(2.71828)}, "1.5, 2.71828"},
+	{"?", Args{"příliš žluťoučký kůň úpěl ďábelské ódy"},
+		"'příliš žluťoučký kůň úpěl ďábelské ódy'"},
+	{"?", Args{sometime}, "'2015-03-05 10:42:43 +0000 UTC'"},
+
+	// NULL
+	{"?, ?", Args{sql.NullString{"Homer", true}, sql.NullString{"Homer", false}},
+		"'Homer', NULL"},
+}
+
+func TestPreprocessingTypes(t *testing.T) {
+	preproc := NewPreprocessor(FakeDriver{})
+	preproc.setMapperFunc(func(s string) string { return s })
+	for _, tt := range typesTests {
+		str, err := preproc.Process(tt.sql, tt.args)
+		if err != nil {
+			t.Fatalf("unexpected err: %s:\n %v", tt.sql, err)
+		}
+		if str != tt.expSQL {
+			t.Errorf("\n got: %v\nwant: %v", str, tt.expSQL)
 		}
 	}
 }

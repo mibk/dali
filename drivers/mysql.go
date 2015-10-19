@@ -3,6 +3,7 @@ package drivers
 import (
 	"io"
 	"strings"
+	"time"
 )
 
 type MySQL struct{}
@@ -44,5 +45,13 @@ func (MySQL) EscapeString(w io.Writer, s string) {
 			writeRune(w, r)
 		}
 	}
+	writeRune(w, '\'')
+}
+
+const mysqlTimeFormat = "2006-01-02 15:04:05"
+
+func (MySQL) EscapeTime(w io.Writer, t time.Time) {
+	writeRune(w, '\'')
+	writeString(w, t.Format(mysqlTimeFormat))
 	writeRune(w, '\'')
 }

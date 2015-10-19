@@ -2,6 +2,7 @@ package drivers
 
 import (
 	"io"
+	"time"
 	"unicode/utf8"
 )
 
@@ -9,6 +10,7 @@ type Driver interface {
 	EscapeIdent(w io.Writer, ident string)
 	EscapeBool(w io.Writer, v bool)
 	EscapeString(w io.Writer, s string)
+	EscapeTime(w io.Writer, t time.Time)
 }
 
 func writeRune(w io.Writer, r rune) (n int, err error) {

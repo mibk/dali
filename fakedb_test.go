@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"time"
 )
 
 type FakeDriver struct {
@@ -21,6 +22,7 @@ func NewFakeDriver() *FakeDriver {
 func (FakeDriver) EscapeIdent(w io.Writer, ident string) { fmt.Fprintf(w, "{%s}", ident) }
 func (FakeDriver) EscapeBool(w io.Writer, v bool)        { fmt.Fprint(w, v) }
 func (FakeDriver) EscapeString(w io.Writer, s string)    { fmt.Fprintf(w, "'%s'", s) }
+func (FakeDriver) EscapeTime(w io.Writer, t time.Time)   { fmt.Fprintf(w, "'%v'", t) }
 
 func (d *FakeDriver) Open(name string) (driver.Conn, error) { return FakeConn{d.cols, d.result}, nil }
 

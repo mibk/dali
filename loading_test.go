@@ -135,6 +135,37 @@ type Eres struct {
 	Last  string
 }
 
+func TestLoading_Types(t *testing.T) {
+	tests := []struct {
+		result   []interface{}
+		v        interface{} // value to load
+		expected interface{}
+	}{
+		{result(struct{ A int64 }{-27}), newTypeOf(int64(0)), int64(-27)},
+		{result(struct{ A float64 }{-2.71828}), newTypeOf(float64(0)), float64(-2.71828)},
+		{result(struct{ A bool }{true}), newTypeOf(false), true},
+		{result(struct{ A bool }{false}), newTypeOf(false), false},
+		{result(struct{ A string }{"Carl"}), newTypeOf(""), "Carl"},
+		{result(struct{ A string }{"Lucas"}), newTypeOf(sql.NullString{}),
+			sql.NullString{"Lucas", true}},
+		{result(struct{ A interface{} }{nil}), newTypeOf(sql.NullString{}),
+			sql.NullString{"", false}},
+	}
+
+	for _, tt := range tests {
+		dvr.SetColumns("A").SetResult(tt.result...)
+		if err := conn.Query("").ScanRow(tt.v); err != nil {
+			panic(err)
+		}
+		vv := reflect.ValueOf(tt.v)
+		v := reflect.Indirect(vv).Interface()
+		if !reflect.DeepEqual(v, tt.expected) {
+			t.Errorf("loading:\n got: %v (%T)\nwant: %v (%T)", v, v, tt.expected,
+				tt.expected)
+		}
+	}
+}
+
 func newTypeOf(v interface{}) interface{}   { return reflect.New(reflect.TypeOf(v)).Interface() }
 func cols(s ...string) []string             { return s }
 func result(v ...interface{}) []interface{} { return v }
