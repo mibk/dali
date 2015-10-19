@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
+	"time"
 )
 
 var (
@@ -150,6 +151,12 @@ func TestLoading_Types(t *testing.T) {
 			sql.NullString{"Lucas", true}},
 		{result(struct{ A interface{} }{nil}), newTypeOf(sql.NullString{}),
 			sql.NullString{"", false}},
+
+		// TIME
+		{result(struct{ A time.Time }{sometime}), newTypeOf(NullTime{}),
+			NullTime{sometime, true}},
+		{result(struct{ A interface{} }{nil}), newTypeOf(NullTime{}),
+			NullTime{time.Time{}, false}},
 	}
 
 	for _, tt := range tests {

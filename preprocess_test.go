@@ -139,6 +139,8 @@ var typesTests = []struct {
 	// NULL
 	{"?, ?", Args{sql.NullString{"Homer", true}, sql.NullString{"Homer", false}},
 		"'Homer', NULL"},
+	{"?, ?", Args{NullTime{sometime, true}, NullTime{sometime, false}},
+		"'2015-03-05 10:42:43 +0000 UTC', NULL"},
 }
 
 func TestPreprocessingTypes(t *testing.T) {
