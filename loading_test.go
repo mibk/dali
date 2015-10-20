@@ -197,3 +197,21 @@ func TestLoading_Types(t *testing.T) {
 func newTypeOf(v interface{}) interface{}   { return reflect.New(reflect.TypeOf(v)).Interface() }
 func cols(s ...string) []string             { return s }
 func result(v ...interface{}) []interface{} { return v }
+
+func BenchmarkLoadingOne(b *testing.B) {
+	dvr.SetColumns("ID", "Name").SetResult(U{1, "John"})
+	b.ResetTimer()
+	var u U
+	for i := 0; i < b.N; i++ {
+		conn.Query("").One(&u)
+	}
+}
+
+func BenchmarkLoadingAll(b *testing.B) {
+	dvr.SetColumns("ID", "Name").SetResult(U{1, "John"}, U{2, "Patrik"}, U{3, "Tomáš"})
+	b.ResetTimer()
+	var u []U
+	for i := 0; i < b.N; i++ {
+		conn.Query("").All(&u)
+	}
+}

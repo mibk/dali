@@ -3,6 +3,7 @@ package dali
 import (
 	"database/sql"
 	"database/sql/driver"
+	"io"
 	"strings"
 	"testing"
 	"time"
@@ -233,4 +234,71 @@ func TestPreprocessingTypes(t *testing.T) {
 func ptrPtrUser() **User {
 	u := &User{}
 	return &u
+}
+
+type NopDriver struct{}
+
+func (NopDriver) EscapeIdent(w io.Writer, ident string) {}
+func (NopDriver) EscapeBool(w io.Writer, v bool)        {}
+func (NopDriver) EscapeString(w io.Writer, s string)    {}
+func (NopDriver) EscapeBytes(w io.Writer, b []byte)     {}
+func (NopDriver) EscapeTime(w io.Writer, t time.Time)   {}
+
+var preproc = NewPreprocessor(NopDriver{})
+
+func init() {
+	preproc.setMapperFunc(func(s string) string { return s })
+}
+
+func BenchmarkColumnEscaping(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		preproc.Process(`SELECT [first_name], [last_name] FROM [user]`, nil)
+	}
+}
+
+func BenchmarkBasicInterpolation(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		preproc.Process(`INSERT INTO ?ident (a, b) VALUES (?, ?)`,
+			Args{"table", 3, "four"})
+	}
+}
+
+func BenchmarkSimpleValueExpansion(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		preproc.Process(`SELECT WHERE a IN (?...)`,
+			Args{[]int64{8, 99, 1013, 1202}})
+	}
+}
+
+func BenchmarkValuesClause(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		preproc.Process(`INSERT ?values`, Args{struct {
+			ID     int64
+			Name   string
+			Create time.Time
+		}{56, "Jacob", time.Time{}}})
+	}
+}
+
+func BenchmarkSetClause(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		preproc.Process(`UPDATE ?set`, Args{struct {
+			ID   int64 `db:",omitinsert"`
+			Name string
+			Age  int
+		}{0, "Veronika", 18}})
+	}
+}
+
+func BenchmarkMultiValuesClause(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		preproc.Process(`INSERT ?values...`, Args{[]struct {
+			ID   int64
+			Name string
+		}{
+			{56, "Jacob"},
+			{104, "Luboš"},
+			{889, "Ibrahim"},
+		}})
+	}
 }
