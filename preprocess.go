@@ -46,18 +46,24 @@ func (p *Preprocessor) Process(sql string, args []interface{}) (string, error) {
 			p.driver.EscapeIdent(b, col)
 			pos += w + 1 // size of ']'
 		case '?':
-			start := pos
+			start, end := pos, pos
+			var expand bool
 			for {
 				r, w := utf8.DecodeRuneInString(sql[pos:])
-				if (r < 'a' || r > 'z') && r != '.' {
+				if r < 'a' || r > 'z' {
+					if strings.HasPrefix(sql[pos:], "...") {
+						pos += 3
+						expand = true
+					}
 					break
 				}
 				pos += w
+				end = pos
 			}
 			if argIndex >= len(args) {
 				return "", fmt.Errorf("dali: there is not enough args for placeholders")
 			}
-			if err := p.interpolate(b, sql[start:pos], args[argIndex]); err != nil {
+			if err := p.interpolate(b, sql[start:end], expand, args[argIndex]); err != nil {
 				return "", err
 			}
 			argIndex++
@@ -71,26 +77,44 @@ func (p *Preprocessor) Process(sql string, args []interface{}) (string, error) {
 	return b.String(), nil
 }
 
-func (p *Preprocessor) interpolate(b *bytes.Buffer, typ string, v interface{}) error {
-	switch typ {
-	case "":
-		return p.escapeValue(b, v)
-	case "...":
-		return p.escapeMultipleValues(b, v)
-	case "ident":
-		col, ok := v.(string)
-		if !ok {
-			return fmt.Errorf("dali: ?ident expects the argument to be a string")
+func (p *Preprocessor) interpolate(b *bytes.Buffer, typ string, expand bool, v interface{}) error {
+	if expand {
+		switch typ {
+		case "":
+			return p.escapeMultipleValues(b, v)
+		case "ident":
+			idents, ok := v.([]string)
+			if !ok {
+				return fmt.Errorf("dali: ?ident... expects the argument to be a []string")
+			}
+			for i, ident := range idents {
+				p.driver.EscapeIdent(b, ident)
+				if i != len(idents)-1 {
+					b.WriteString(", ")
+				}
+			}
+		case "values":
+			return p.printMultiValuesClause(b, v)
+		default:
+			return fmt.Errorf("dali: ?%s cannot be expanded (...) or doesn't exist", typ)
 		}
-		p.driver.EscapeIdent(b, col)
-	case "values":
-		return p.printValuesClause(b, v)
-	case "values...":
-		return p.printMultiValuesClause(b, v)
-	case "set":
-		return p.printSetClause(b, v)
-	default:
-		return fmt.Errorf("dali: unknown placeholder ?%s", typ)
+	} else {
+		switch typ {
+		case "":
+			return p.escapeValue(b, v)
+		case "ident":
+			ident, ok := v.(string)
+			if !ok {
+				return fmt.Errorf("dali: ?ident expects the argument to be a string")
+			}
+			p.driver.EscapeIdent(b, ident)
+		case "values":
+			return p.printValuesClause(b, v)
+		case "set":
+			return p.printSetClause(b, v)
+		default:
+			return fmt.Errorf("dali: unknown placeholder ?%s", typ)
+		}
 	}
 	return nil
 }

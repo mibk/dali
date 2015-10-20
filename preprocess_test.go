@@ -16,6 +16,10 @@ var placeholderTests = []struct {
 	{"SELECT * FROM [x] WHERE a = ? AND b = ?", Args{3, "four"},
 		"SELECT * FROM {x} WHERE a = 3 AND b = 'four'"},
 
+	{"SELECT ?ident.id", Args{"my_table"}, "SELECT {my_table}.id"},
+	{"SELECT ?ident...", Args{[]string{"col1", "col2", "another"}},
+		"SELECT {col1}, {col2}, {another}"},
+
 	{"INSERT INTO [user] ?values", Args{User{1, "Salvador", 0}},
 		"INSERT INTO {user} ({id}, {user_name}) VALUES (1, 'Salvador')"},
 	{"INSERT INTO [user] ?values...", Args{[]User{
@@ -152,6 +156,7 @@ var errorTests = []struct {
 	{"SELECT ?, ?", Args{3, 4, 5}, "dali: only 2 args are expected"},
 	{"INSERT INTO ?ident", Args{5}, "dali: ?ident expects the argument to be a string"},
 	{"INSERT INTO ?u", Args{5}, "dali: unknown placeholder ?u"},
+	{"INSERT ?u...", Args{nil}, "dali: ?u cannot be expanded (...) or doesn't exist"},
 	{"INSERT INTO ?", Args{func() {}}, "dali: invalid argument type: func()"},
 	{"WHERE IN ?...", Args{14}, "dali: ?... expects the argument to be a slice"},
 	{"INSERT ?values", Args{ptrPtrUser()}, "dali: argument must be a pointer to a struct"},
