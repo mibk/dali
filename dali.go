@@ -75,6 +75,18 @@ func (c *Connection) Query(query string, args ...interface{}) *Query {
 	}
 }
 
+// Begin starts a transaction. The isolation level is dependent on
+// the driver.
+func (c *Connection) Begin() (*Tx, error) {
+	tx, err := c.DB.Begin()
+	if err != nil {
+		return nil, err
+	}
+	return &Tx{
+		conn: c,
+		Tx:   tx}, nil
+}
+
 // SetMapperFunc sets a mapper func which is used when deriving
 // column names from field names. It none is set, the dali.ToUnderscore
 // func is used.
