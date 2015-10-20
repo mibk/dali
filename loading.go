@@ -1,11 +1,15 @@
 package dali
 
-import "reflect"
+import (
+	"database/sql"
+	"reflect"
+)
 
 // One executes a query that returns rows loads the resulting
 // data into dest which is expected to be a struct.
 // Only fields that match the column names (after filtering
-// through the mapperFunc) are filled.
+// through the mapperFunc) are filled. One returns sql.ErrNoRows
+// if there are no rows.
 func (q *Query) One(dest interface{}) error {
 	destv := reflect.ValueOf(dest)
 	if destv.Kind() != reflect.Ptr {
@@ -85,6 +89,10 @@ func (q *Query) load(v reflect.Value, elemt reflect.Type, loadJustOne, isPtr boo
 	}
 	fields := make([]interface{}, len(fieldIndexes))
 
+	err = nil
+	if loadJustOne {
+		err = sql.ErrNoRows
+	}
 	for rows.Next() {
 		elemvptr := reflect.New(elemt)
 		elemv := reflect.Indirect(elemvptr)
@@ -102,6 +110,7 @@ func (q *Query) load(v reflect.Value, elemt reflect.Type, loadJustOne, isPtr boo
 		if loadJustOne {
 			// v must is a struct.
 			v.Set(elemv)
+			err = nil
 			break
 			// Otherwise, v must be a slice.
 		} else if isPtr {
@@ -110,7 +119,10 @@ func (q *Query) load(v reflect.Value, elemt reflect.Type, loadJustOne, isPtr boo
 			v.Set(reflect.Append(v, elemv))
 		}
 	}
-	return rows.Err()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	return err
 }
 
 var ignoreField interface{}

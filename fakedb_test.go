@@ -15,9 +15,7 @@ type FakeDriver struct {
 }
 
 func NewFakeDriver() *FakeDriver {
-	cols := make([]string, 0)
-	result := make([]interface{}, 0)
-	return &FakeDriver{cols, result, 0}
+	return &FakeDriver{}
 }
 
 func (FakeDriver) EscapeIdent(w io.Writer, ident string) { fmt.Fprintf(w, "{%s}", ident) }

@@ -194,6 +194,15 @@ func TestLoading_Types(t *testing.T) {
 	}
 }
 
+func TestErrNoRows(t *testing.T) {
+	var u U
+	dvr.SetResult()
+	if err := conn.Query("").One(&u); err != sql.ErrNoRows {
+		t.Errorf("Query.One should return sql.ErrNoRows if there are no rows\ngot %v", err)
+	}
+
+}
+
 func newTypeOf(v interface{}) interface{}   { return reflect.New(reflect.TypeOf(v)).Interface() }
 func cols(s ...string) []string             { return s }
 func result(v ...interface{}) []interface{} { return v }
