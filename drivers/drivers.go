@@ -3,7 +3,6 @@ package drivers
 import (
 	"io"
 	"time"
-	"unicode/utf8"
 )
 
 type Driver interface {
@@ -14,13 +13,8 @@ type Driver interface {
 	EscapeTime(w io.Writer, t time.Time)
 }
 
-func writeRune(w io.Writer, r rune) (n int, err error) {
-	if r < utf8.RuneSelf {
-		return w.Write([]byte{byte(r)})
-	}
-	runeBuf := make([]byte, 4)
-	n = utf8.EncodeRune(runeBuf, r)
-	return w.Write(runeBuf[:n])
+func writeByte(w io.Writer, b byte) (n int, err error) {
+	return w.Write([]byte{b})
 }
 
 func writeString(w io.Writer, s string) (n int, err error) {

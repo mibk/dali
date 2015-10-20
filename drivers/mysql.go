@@ -9,17 +9,17 @@ import (
 type MySQL struct{}
 
 func (MySQL) EscapeIdent(w io.Writer, ident string) {
-	writeRune(w, '`')
+	writeByte(w, '`')
 	r := strings.NewReplacer("`", "``")
 	writeString(w, r.Replace(ident))
-	writeRune(w, '`')
+	writeByte(w, '`')
 }
 
 func (MySQL) EscapeBool(w io.Writer, v bool) {
 	if v {
-		writeRune(w, '1')
+		writeByte(w, '1')
 	} else {
-		writeRune(w, '0')
+		writeByte(w, '0')
 	}
 }
 
@@ -33,34 +33,40 @@ func (MySQL) EscapeBytes(w io.Writer, b []byte) {
 }
 
 func escapeBytes(w io.Writer, bytes []byte) {
-	writeRune(w, '\'')
+	writeByte(w, '\'')
 	for _, b := range bytes {
+		// See https://dev.mysql.com/doc/refman/5.7/en/string-literals.html
+		// for more information on how to escape string literals in MySQL.
 		switch b {
+		case 0:
+			writeString(w, `\0`)
 		case '\'':
 			writeString(w, `\'`)
 		case '"':
 			writeString(w, `\"`)
-		case '\\':
-			writeString(w, `\\`)
+		case '\b':
+			writeString(w, `\b`)
 		case '\n':
 			writeString(w, `\n`)
 		case '\r':
 			writeString(w, `\r`)
-		case 0:
-			writeString(w, `\x00`)
+		case '\t':
+			writeString(w, `\t`)
 		case 0x1A:
-			writeString(w, `\x1a`)
+			writeString(w, `\Z`)
+		case '\\':
+			writeString(w, `\\`)
 		default:
-			writeRune(w, rune(b))
+			writeByte(w, b)
 		}
 	}
-	writeRune(w, '\'')
+	writeByte(w, '\'')
 }
 
 const mysqlTimeFormat = "2006-01-02 15:04:05"
 
 func (MySQL) EscapeTime(w io.Writer, t time.Time) {
-	writeRune(w, '\'')
+	writeByte(w, '\'')
 	writeString(w, t.Format(mysqlTimeFormat))
-	writeRune(w, '\'')
+	writeByte(w, '\'')
 }

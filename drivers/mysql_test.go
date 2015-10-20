@@ -49,7 +49,9 @@ func TestEscapeString(t *testing.T) {
 	}{
 		{"simple", "'simple'"},
 		{`simplers's "world"`, `'simplers\'s \"world\"'`},
-		{"\n\r\x00\x1A", `'\n\r\x00\x1a'`},
+		{"\x00'\"\b\n\r", `'\0\'\"\b\n\r'`},
+		{"\t\x1A\\", `'\t\Z\\'`},
+		{"příliš žluťoučký kůň úpěl ďábelské ódy", "'příliš žluťoučký kůň úpěl ďábelské ódy'"},
 	}
 	for _, tt := range tests {
 		b := new(bytes.Buffer)
