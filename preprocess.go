@@ -112,6 +112,13 @@ func (p *Preprocessor) interpolate(b *bytes.Buffer, typ string, expand bool, v i
 			return p.printValuesClause(b, v)
 		case "set":
 			return p.printSetClause(b, v)
+		case "raw":
+			raw, ok := v.(string)
+			if !ok {
+				return fmt.Errorf("dali: ?raw expects the argument to be a string")
+			}
+			_, err := b.WriteString(raw)
+			return err
 		default:
 			return fmt.Errorf("dali: unknown placeholder ?%s", typ)
 		}
