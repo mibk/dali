@@ -169,9 +169,9 @@ func TestLoading_Types(t *testing.T) {
 		{result(struct{ A bool }{false}), newTypeOf(false), false},
 		{result(struct{ A string }{"Carl"}), newTypeOf(""), "Carl"},
 		{result(struct{ A string }{"Lucas"}), newTypeOf(sql.NullString{}),
-			sql.NullString{"Lucas", true}},
+			sql.NullString{String: "Lucas", Valid: true}},
 		{result(struct{ A interface{} }{nil}), newTypeOf(sql.NullString{}),
-			sql.NullString{"", false}},
+			sql.NullString{}},
 
 		// TIME
 		{result(struct{ A time.Time }{sometime}), newTypeOf(NullTime{}),

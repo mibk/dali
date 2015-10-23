@@ -7,7 +7,10 @@ import (
 	"github.com/mibk/dali/drivers"
 )
 
-// Connection is a connection to the database.
+// Connection wraps the sql.DB and provides slightly different
+// API for comunation with the database. The primary method
+// is Query which then provides methods for executing queries
+// or scanning results.
 type Connection struct {
 	DB      *sql.DB
 	preproc *Preprocessor

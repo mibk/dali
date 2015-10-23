@@ -211,7 +211,7 @@ var typesTests = []struct {
 	{"?", Args{sometime}, "'2015-03-05 10:42:43 +0000 UTC'"},
 
 	// NULL
-	{"?, ?", Args{sql.NullString{"Homer", true}, sql.NullString{"Homer", false}},
+	{"?, ?", Args{sql.NullString{String: "Homer", Valid: true}, sql.NullString{String: "Homer"}},
 		"'Homer', NULL"},
 	{"?, ?", Args{NullTime{sometime, true}, NullTime{sometime, false}},
 		"'2015-03-05 10:42:43 +0000 UTC', NULL"},

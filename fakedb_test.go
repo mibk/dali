@@ -98,9 +98,7 @@ type FakeTx struct{}
 
 func (FakeTx) Commit() error {
 	panic("not implemented")
-	return nil
 }
 func (FakeTx) Rollback() error {
 	panic("not implemented")
-	return nil
 }

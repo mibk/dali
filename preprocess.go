@@ -27,7 +27,7 @@ func NewPreprocessor(driver drivers.Driver) *Preprocessor {
 	return &Preprocessor{driver, ToUnderscore}
 }
 
-// Preprocess processes the sql using the driver.
+// Process processes the sql query using the driver.
 func (p *Preprocessor) Process(sql string, args []interface{}) (string, error) {
 	b := new(bytes.Buffer)
 	pos := 0

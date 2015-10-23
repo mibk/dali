@@ -2,6 +2,9 @@ package dali
 
 import "database/sql"
 
+// Tx wraps the sql.Tx to provide the Query method instead
+// of the sql.Tx's original methods for comunication with
+// the database.
 type Tx struct {
 	conn *Connection
 	Tx   *sql.Tx
