@@ -68,7 +68,7 @@ var placeholderTests = []struct {
 }
 
 func TestPlaceholders(t *testing.T) {
-	preproc := NewPreprocessor(FakeDriver{})
+	preproc := NewPreprocessor(FakeDialect{})
 	for _, tt := range placeholderTests {
 		str, err := preproc.Process(tt.sql, tt.args)
 		if err != nil {
@@ -169,7 +169,7 @@ var errorTests = []struct {
 }
 
 func TestErrors(t *testing.T) {
-	preproc := NewPreprocessor(FakeDriver{})
+	preproc := NewPreprocessor(FakeDialect{})
 	for _, tt := range errorTests {
 		_, err := preproc.Process(tt.sql, tt.args)
 		if err == nil {
@@ -218,7 +218,7 @@ var typesTests = []struct {
 }
 
 func TestPreprocessingTypes(t *testing.T) {
-	preproc := NewPreprocessor(FakeDriver{})
+	preproc := NewPreprocessor(FakeDialect{})
 	preproc.setMapperFunc(func(s string) string { return s })
 	for _, tt := range typesTests {
 		str, err := preproc.Process(tt.sql, tt.args)

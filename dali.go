@@ -2,44 +2,45 @@ package dali
 
 import (
 	"database/sql"
-	"fmt"
 
-	"github.com/mibk/dali/drivers"
+	"github.com/mibk/dali/dialects"
 )
 
-// Connection wraps the sql.DB and provides slightly different
-// API for comunation with the database. The primary method
-// is Query which then provides methods for executing queries
+// DB wraps the sql.DB and provides slightly different
+// API for communication with the database. The primary method
+// is Query which provides methods for executing queries
 // or scanning results.
-type Connection struct {
+type DB struct {
 	DB      *sql.DB
 	preproc *Preprocessor
 }
 
-// NewConnection instantiates a Connection for the given database/sql connection.
-func NewConnection(db *sql.DB, driver drivers.Driver) *Connection {
-	return &Connection{db, NewPreprocessor(driver)}
+// NewDBFromHandler instantiates DB from the given database/sql DB handler
+// in the particular dialect.
+func NewDBFromHandler(db *sql.DB, dialect dialects.Dialect) *DB {
+	return &DB{db, NewPreprocessor(dialect)}
 }
 
-// Open opens a database by calling sql.Open. It returns new Connection
-// with nil EventReceiver.
-func Open(driverName, dataSourceName string) (*Connection, error) {
-	var driver drivers.Driver
+// Open opens a database by calling sql.Open. It returns a new DB and
+// selects the appropriate dialect which is inferred from the driverName.
+// It panics if the dialect is not supported by dali itself.
+func Open(driverName, dataSourceName string) (*DB, error) {
+	var dialect dialects.Dialect
 	switch driverName {
 	case "mysql":
-		driver = drivers.MySQL{}
+		dialect = dialects.MySQL{}
 	default:
-		return nil, fmt.Errorf("dali: unsupported driver")
+		panic("dali: unsupported dialect")
 	}
 	db, err := sql.Open(driverName, dataSourceName)
 	if err != nil {
 		return nil, err
 	}
-	return NewConnection(db, driver), nil
+	return NewDBFromHandler(db, dialect), nil
 }
 
 // MustOpen is like Open but panics on error.
-func MustOpen(driverName, dataSourceName string) *Connection {
+func MustOpen(driverName, dataSourceName string) *DB {
 	conn, err := Open(driverName, dataSourceName)
 	if err != nil {
 		panic(err)
@@ -49,7 +50,7 @@ func MustOpen(driverName, dataSourceName string) *Connection {
 
 // MustOpenAndVerify is like MustOpen but it verifies the connection and
 // panics on error.
-func MustOpenAndVerify(driverName, dataSourceName string) *Connection {
+func MustOpenAndVerify(driverName, dataSourceName string) *DB {
 	conn := MustOpen(driverName, dataSourceName)
 	if err := conn.Ping(); err != nil {
 		panic(err)
@@ -58,21 +59,25 @@ func MustOpenAndVerify(driverName, dataSourceName string) *Connection {
 }
 
 // Close closes the database, releasing any open resources.
-func (c *Connection) Close() error {
-	return c.DB.Close()
+func (db *DB) Close() error {
+	return db.DB.Close()
 }
 
 // Ping verifies a connection to the database is still alive, establishing
 // a connection if necessary.
-func (c *Connection) Ping() error {
-	return c.DB.Ping()
+func (db *DB) Ping() error {
+	return db.DB.Ping()
 }
 
 // Query creates Query by the raw SQL query and args.
-func (c *Connection) Query(query string, args ...interface{}) *Query {
+
+// Query is a fundamental method of DB. It returns a Query struct
+// which is capable of executing the sql (given by the query and
+// the args) or loading the result into structs or primitive values.
+func (db *DB) Query(query string, args ...interface{}) *Query {
 	return &Query{
-		execer:  c.DB,
-		preproc: c.preproc,
+		execer:  db.DB,
+		preproc: db.preproc,
 		query:   query,
 		args:    args,
 	}
@@ -80,21 +85,21 @@ func (c *Connection) Query(query string, args ...interface{}) *Query {
 
 // Begin starts a transaction. The isolation level is dependent on
 // the driver.
-func (c *Connection) Begin() (*Tx, error) {
-	tx, err := c.DB.Begin()
+func (db *DB) Begin() (*Tx, error) {
+	tx, err := db.DB.Begin()
 	if err != nil {
 		return nil, err
 	}
 	return &Tx{
-		conn: c,
+		conn: db,
 		Tx:   tx}, nil
 }
 
 // SetMapperFunc sets a mapper func which is used when deriving
-// column names from field names. It none is set, the dali.ToUnderscore
+// column names from field names. If none is set, ToUnderscore
 // func is used.
-func (c *Connection) SetMapperFunc(f func(string) string) {
-	c.preproc.setMapperFunc(f)
+func (db *DB) SetMapperFunc(f func(string) string) {
+	db.preproc.setMapperFunc(f)
 }
 
 type execer interface {

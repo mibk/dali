@@ -8,36 +8,36 @@ import (
 	"time"
 )
 
-type FakeDriver struct {
+type FakeDialect struct {
 	cols   []string
 	result []interface{}
 	cur    int
 }
 
-func NewFakeDriver() *FakeDriver {
-	return &FakeDriver{}
+func NewFakeDialect() *FakeDialect {
+	return &FakeDialect{}
 }
 
-func (FakeDriver) EscapeIdent(w io.Writer, ident string) { fmt.Fprintf(w, "{%s}", ident) }
-func (FakeDriver) EscapeBool(w io.Writer, v bool)        { fmt.Fprint(w, v) }
-func (FakeDriver) EscapeString(w io.Writer, s string)    { fmt.Fprintf(w, "'%s'", s) }
-func (FakeDriver) EscapeBytes(w io.Writer, b []byte)     { fmt.Fprintf(w, "`%s`", string(b)) }
-func (FakeDriver) EscapeTime(w io.Writer, t time.Time)   { fmt.Fprintf(w, "'%v'", t) }
+func (FakeDialect) EscapeIdent(w io.Writer, ident string) { fmt.Fprintf(w, "{%s}", ident) }
+func (FakeDialect) EscapeBool(w io.Writer, v bool)        { fmt.Fprint(w, v) }
+func (FakeDialect) EscapeString(w io.Writer, s string)    { fmt.Fprintf(w, "'%s'", s) }
+func (FakeDialect) EscapeBytes(w io.Writer, b []byte)     { fmt.Fprintf(w, "`%s`", string(b)) }
+func (FakeDialect) EscapeTime(w io.Writer, t time.Time)   { fmt.Fprintf(w, "'%v'", t) }
 
-func (d *FakeDriver) Open(name string) (driver.Conn, error) { return FakeConn{d}, nil }
+func (d *FakeDialect) Open(name string) (driver.Conn, error) { return FakeConn{d}, nil }
 
-func (d *FakeDriver) SetColumns(cols ...string) *FakeDriver {
+func (d *FakeDialect) SetColumns(cols ...string) *FakeDialect {
 	d.cols = cols
 	return d
 }
 
-func (d *FakeDriver) SetResult(result ...interface{}) *FakeDriver {
+func (d *FakeDialect) SetResult(result ...interface{}) *FakeDialect {
 	d.result = result
 	return d
 }
 
 type FakeConn struct {
-	d *FakeDriver
+	d *FakeDialect
 }
 
 func (c FakeConn) Prepare(query string) (driver.Stmt, error) { return FakeStmt{c.d}, nil }
@@ -45,7 +45,7 @@ func (FakeConn) Close() error                                { return nil }
 func (FakeConn) Begin() (driver.Tx, error)                   { return FakeTx{}, nil }
 
 type FakeStmt struct {
-	d *FakeDriver
+	d *FakeDialect
 }
 
 func (FakeStmt) Close() error                                    { return nil }
@@ -62,7 +62,7 @@ func (FakeResult) LastInsertId() (int64, error) { return 0, nil }
 func (FakeResult) RowsAffected() (int64, error) { return 0, nil }
 
 type FakeRows struct {
-	d *FakeDriver
+	d *FakeDialect
 }
 
 func (FakeRows) Close() error { return nil }
@@ -77,11 +77,11 @@ func (r *FakeRows) Next(dest []driver.Value) error {
 	r.d.cur++
 	rowv := reflect.ValueOf(row)
 	if rowv.Kind() != reflect.Struct {
-		panic("fake driver: result must be a slice of structs")
+		panic("fake db: result must be a slice of structs")
 	}
 	cols := r.Columns()
 	if len(dest) != len(cols) {
-		panic("fake driver: dest len and column count must match")
+		panic("fake db: dest len and column count must match")
 	}
 	for i, col := range cols {
 		v := rowv.FieldByName(col)

@@ -2,11 +2,11 @@
 # Database Abstraction Layer (í) [![GoDoc](https://godoc.org/github.com/mibk/dali?status.png)](https://godoc.org/github.com/mibk/dali)
 
 DALí is not exactly a database abstration layer. It doesn't try to abstract the SQL in a way
-that the queries could run without changing on any supported driver. It rather abstracts
-just placeholder manipulation and provides convenient ways for some common situations.
+that the queries could run unchanged on any supported database. It rather abstracts
+just the placeholder manipulation and provides convenient ways for some common situations.
 
-The main goal of this project is to provide a clean, compact API for comunication with
-an SQL database.
+The main goal of this project is to provide a clean, compact API for communication with
+SQL databases.
 
 ## Status
 
@@ -25,10 +25,10 @@ import (
 	"github.com/mibk/dali"
 )
 
-var conn = dali.MustOpenAndVerify("mysql", "root@/example?parseTime=true")
+var db = dali.MustOpenAndVerify("mysql", "root@/example?parseTime=true")
 
 func main() {
-	res := conn.Query(`INSERT INTO [group] ?values`, dali.Map{"name": "admins"}).
+	res := db.Query(`INSERT INTO [group] ?values`, dali.Map{"name": "admins"}).
 		MustExec()
 	// INSERT INTO `group` (`name`) VALUES ('admins')
 
@@ -37,11 +37,11 @@ func main() {
 		{0, "Peter", "peter@foo.com", groupID, time.Now()},
 		{0, "Nick", "nick@bar.org", groupID, time.Now()},
 	}
-	conn.Query(`INSERT INTO [user] ?values...`, users).MustExec()
+	db.Query(`INSERT INTO [user] ?values...`, users).MustExec()
 	// ?values... expands a slice of struct into multi insert
 
 	var u User
-	q := conn.Query(`SELECT * FROM user WHERE group_id IN (?...) LIMIT 1`,
+	q := db.Query(`SELECT * FROM user WHERE group_id IN (?...) LIMIT 1`,
 		[]int64{1, 2, 5})
 	fmt.Println(q) // the query implements fmt.Stringer
 	if err := q.One(&u); err != nil {
@@ -94,22 +94,22 @@ you can use
 sql := `SELECT [where]
 	FROM location
 ```
-So there is one way to escape identifiers among all drivers.
+So there is one way to escape identifiers among all dialects.
 
 ### Handy placeholders
 
-Again, placeholder manipulation is the same for all drivers and besides that it also provides
+Again, placeholder manipulation is the same for all dialects and besides that it also provides
 some additional placeholders. The complete list is:
 
 ```
 ?          primitive value or a value implementing driver.Valuer
 ?...       a slice of values which is going to be expanded (especially useful in
            IN clauses)
-?values    expects as an argument either Map, or a struct. It derives column names
-           from map keys or struct fields and constructs a VALUES clause (e.g. INSERT
-           INTO user ?values)
+?values    expects either Map, or a struct as an argument. It derives column names
+           from map keys or struct fields and constructs a VALUES clause (e.g.
+           INSERT INTO user ?values)
 ?set       similar to ?values but used for SET clauses (e.g. UPDATE user SET ?set)
-?values... expects as an argument a slice of structs which is expanded into multi
+?values... expects a slice of structs as an argument which is expanded into multi
            INSERT clause
 ?ident     used for identifiers (column or table name)
 ?ident...  expands identifiers and separates them with a comma
@@ -123,12 +123,12 @@ benefit. This behaviour is taken from the **gocraft/dbr** library. See
 [this](https://github.com/gocraft/dbr#faster-performance-than-using-using-databasesql-directly)
 for more information.
 
-### Driver support
+### Supported dialects
 
-Currently, only a MySQL driver is implemented directly in this package (see [drivers](drivers)
-for more information). Nevertheless supporting another driver should be as easy as creating
-a new driver implementing *drivers.Driver* interface. In the future, there will be the most
-common drivers implemented directly here.
+Currently, only a MySQL dialect is implemented directly in this package (see [dialects](dialects)
+for more information). Nevertheless, supporting another dialect should be as easy as creating
+a new dialect implementing *dialects.Dialect* interface. The most common dialects will be
+implemented directly in the future.
 
 ## Thanks
 

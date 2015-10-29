@@ -12,22 +12,25 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/mibk/dali/drivers"
+	"github.com/mibk/dali/dialects"
 )
 
 // ErrNotUTF8 is returned when a string argument is not a valid UTF-8 string.
 var ErrNotUTF8 = errors.New("dali: argument is not a valid UTF-8 string")
 
+// Preprocessor processes SQL queries using a dialect.
 type Preprocessor struct {
-	driver     drivers.Driver
+	dialect    dialects.Dialect
 	mapperFunc func(string) string
 }
 
-func NewPreprocessor(driver drivers.Driver) *Preprocessor {
-	return &Preprocessor{driver, ToUnderscore}
+// NewPreprocessor creates a new Preprocessor.
+func NewPreprocessor(dialect dialects.Dialect) *Preprocessor {
+	return &Preprocessor{dialect, ToUnderscore}
 }
 
-// Process processes the sql query using the driver.
+// Process processes the sql and the args. It returns the resulting SQL query and
+// an error if there is one.
 func (p *Preprocessor) Process(sql string, args []interface{}) (string, error) {
 	b := new(bytes.Buffer)
 	pos := 0
@@ -43,7 +46,7 @@ func (p *Preprocessor) Process(sql string, args []interface{}) (string, error) {
 				return "", fmt.Errorf("dali: identifier not terminated")
 			}
 			col := sql[pos : pos+w]
-			p.driver.EscapeIdent(b, col)
+			p.dialect.EscapeIdent(b, col)
 			pos += w + 1 // size of ']'
 		case '?':
 			start, end := pos, pos
@@ -88,7 +91,7 @@ func (p *Preprocessor) interpolate(b *bytes.Buffer, typ string, expand bool, v i
 				return fmt.Errorf("dali: ?ident... expects the argument to be a []string")
 			}
 			for i, ident := range idents {
-				p.driver.EscapeIdent(b, ident)
+				p.dialect.EscapeIdent(b, ident)
 				if i != len(idents)-1 {
 					b.WriteString(", ")
 				}
@@ -107,7 +110,7 @@ func (p *Preprocessor) interpolate(b *bytes.Buffer, typ string, expand bool, v i
 			if !ok {
 				return fmt.Errorf("dali: ?ident expects the argument to be a string")
 			}
-			p.driver.EscapeIdent(b, ident)
+			p.dialect.EscapeIdent(b, ident)
 		case "values":
 			return p.printValuesClause(b, v)
 		case "set":
@@ -139,7 +142,7 @@ func (p *Preprocessor) escapeValue(b *bytes.Buffer, v interface{}) error {
 	}
 	switch v := v.(type) {
 	case bool:
-		p.driver.EscapeBool(b, v)
+		p.dialect.EscapeBool(b, v)
 
 	// signed integers
 	case int:
@@ -175,13 +178,13 @@ func (p *Preprocessor) escapeValue(b *bytes.Buffer, v interface{}) error {
 		if !utf8.ValidString(v) {
 			return ErrNotUTF8
 		}
-		p.driver.EscapeString(b, v)
+		p.dialect.EscapeString(b, v)
 
 	case []byte:
-		p.driver.EscapeBytes(b, v)
+		p.dialect.EscapeBytes(b, v)
 
 	case time.Time:
-		p.driver.EscapeTime(b, v)
+		p.dialect.EscapeTime(b, v)
 	default:
 		return fmt.Errorf("dali: invalid argument type: %T", v)
 	}
@@ -209,7 +212,7 @@ func (p *Preprocessor) escapeMultipleValues(b *bytes.Buffer, v interface{}) erro
 	return nil
 }
 
-// Map is just an alias for map[string]interface{}. It's shorter.
+// Map is just an alias for map[string]interface{}.
 type Map map[string]interface{}
 
 func (p *Preprocessor) printValuesClause(b *bytes.Buffer, v interface{}) error {
@@ -219,7 +222,7 @@ func (p *Preprocessor) printValuesClause(b *bytes.Buffer, v interface{}) error {
 	}
 	b.WriteRune('(')
 	for i, c := range cols {
-		p.driver.EscapeIdent(b, c)
+		p.dialect.EscapeIdent(b, c)
 		if i != len(vals)-1 {
 			b.WriteString(", ")
 		}
@@ -243,7 +246,7 @@ func (p *Preprocessor) printSetClause(b *bytes.Buffer, v interface{}) error {
 	b.WriteString("SET ")
 	for i, c := range cols {
 		v := vals[i]
-		p.driver.EscapeIdent(b, c)
+		p.dialect.EscapeIdent(b, c)
 		b.WriteString(" = ")
 		p.escapeValue(b, v)
 		if i != len(vals)-1 {
@@ -296,7 +299,7 @@ func (p *Preprocessor) printMultiValuesClause(b *bytes.Buffer, v interface{}) er
 	cols, indexes := p.colNamesAndFieldIndexes(el, true)
 	b.WriteRune('(')
 	for i, c := range cols {
-		p.driver.EscapeIdent(b, c)
+		p.dialect.EscapeIdent(b, c)
 		if i != len(cols)-1 {
 			b.WriteString(", ")
 		}

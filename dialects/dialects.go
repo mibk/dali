@@ -1,11 +1,11 @@
-package drivers
+package dialects
 
 import (
 	"io"
 	"time"
 )
 
-type Driver interface {
+type Dialect interface {
 	EscapeIdent(w io.Writer, ident string)
 	EscapeBool(w io.Writer, v bool)
 	EscapeString(w io.Writer, s string)

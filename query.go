@@ -11,13 +11,8 @@ type Query struct {
 	args    []interface{}
 }
 
-// SQL returns the raw SQL query and the args.
-func (q *Query) SQL() (query string, args []interface{}) {
-	return q.query, q.args
-}
-
 // Exec executes a query that doesn't return rows.
-// For example: an INSERT and UPDATE.
+// For example: INSERT or UPDATE.
 func (q *Query) Exec() (sql.Result, error) {
 	sql, err := q.process()
 	if err != nil {
@@ -44,8 +39,8 @@ func (q *Query) Rows() (*sql.Rows, error) {
 	return q.execer.Query(sql)
 }
 
-// ScanRow executes a query that is expected to return at most one row
-// and copies the columns from the matched row into the values
+// ScanRow executes a query that is expected to return at most one row.
+// It copies the columns from the matched row into the values
 // pointed at by dest. If more than one row matches the query,
 // ScanRow uses the first row and discards the rest. If no row matches
 // the query, ScanRow returns sql.ErrNoRows.
@@ -67,5 +62,5 @@ func (q *Query) String() string {
 
 // process returns a preprocessed SQL query.
 func (q *Query) process() (sql string, err error) {
-	return q.preproc.Process(q.SQL())
+	return q.preproc.Process(q.query, q.args)
 }

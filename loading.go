@@ -5,8 +5,8 @@ import (
 	"reflect"
 )
 
-// One executes a query that returns rows loads the resulting
-// data into dest which is expected to be a struct.
+// One executes a query that returns rows and loads the resulting
+// data from the first row into dest which must be a struct.
 // Only fields that match the column names (after filtering
 // through the mapperFunc) are filled. One returns sql.ErrNoRows
 // if there are no rows.
@@ -26,11 +26,11 @@ func (q *Query) One(dest interface{}) error {
 // data into dest which could be either a slice of structs, or
 // a slice of primitive types.
 //
-// If the slice element is a primitive
-// type, query is expected to return only 1 column at each row.
-// The values of these columns are than filled to the slice.
+// If the slice element is a primitive type, query is expected
+// to return only 1 column for each row. dest is the filled
+// with these values.
 //
-// It it is a struct, only fields that match the column names
+// If it is a struct, only fields that match the column names
 // (after filtering through the mapperFunc) are filled.
 func (q *Query) All(dest interface{}) error {
 	destv := reflect.ValueOf(dest)

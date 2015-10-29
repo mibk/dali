@@ -9,18 +9,18 @@ import (
 )
 
 var (
-	dvr  *FakeDriver
-	conn *Connection
+	dvr  *FakeDialect
+	conn *DB
 )
 
 func init() {
-	dvr = NewFakeDriver()
+	dvr = NewFakeDialect()
 	sql.Register("dali", dvr)
 	db, err := sql.Open("dali", "")
 	if err != nil {
 		panic(err)
 	}
-	conn = NewConnection(db, dvr)
+	conn = NewDBFromHandler(db, dvr)
 	conn.SetMapperFunc(func(s string) string { return s })
 }
 

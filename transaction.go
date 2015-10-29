@@ -6,7 +6,7 @@ import "database/sql"
 // of the sql.Tx's original methods for comunication with
 // the database.
 type Tx struct {
-	conn *Connection
+	conn *DB
 	Tx   *sql.Tx
 }
 
