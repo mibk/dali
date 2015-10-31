@@ -6,15 +6,15 @@ import "database/sql"
 // of the sql.Tx's original methods for comunication with
 // the database.
 type Tx struct {
-	conn *DB
-	Tx   *sql.Tx
+	db *DB
+	Tx *sql.Tx
 }
 
 // Query creates Query by the raw SQL query and args.
 func (tx *Tx) Query(query string, args ...interface{}) *Query {
 	return &Query{
 		execer:  tx.Tx,
-		preproc: tx.conn.preproc,
+		preproc: tx.db.preproc,
 		query:   query,
 		args:    args,
 	}

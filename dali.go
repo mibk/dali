@@ -69,8 +69,6 @@ func (db *DB) Ping() error {
 	return db.DB.Ping()
 }
 
-// Query creates Query by the raw SQL query and args.
-
 // Query is a fundamental method of DB. It returns a Query struct
 // which is capable of executing the sql (given by the query and
 // the args) or loading the result into structs or primitive values.
@@ -91,8 +89,9 @@ func (db *DB) Begin() (*Tx, error) {
 		return nil, err
 	}
 	return &Tx{
-		conn: db,
-		Tx:   tx}, nil
+		db: db,
+		Tx: tx,
+	}, nil
 }
 
 // SetMapperFunc sets a mapper func which is used when deriving
