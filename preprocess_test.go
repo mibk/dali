@@ -3,6 +3,7 @@ package dali
 import (
 	"database/sql"
 	"database/sql/driver"
+	"fmt"
 	"io"
 	"strings"
 	"testing"
@@ -236,13 +237,56 @@ func ptrPtrUser() **User {
 	return &u
 }
 
+var preparedStmtTests = []struct {
+	sql     string
+	args    []interface{}
+	wantSQL string
+	wantErr string
+}{
+
+	{"SELECT ?ident WHERE [id] = ?", Args{"name"}, "SELECT {name} WHERE {id} = &1", ""},
+	{"WHERE [name] LIKE ? AND [age] < ?", Args{}, "WHERE {name} LIKE &1 AND {age} < &2", ""},
+
+	// arg count mismatch
+	{"SELECT ?ident", Args{}, "", "dali: there is not enough args for placeholders"},
+	{"SELECT ?ident", Args{"name", 3}, "", "dali: only 1 args are expected"},
+
+	// unsupported placeholders
+	{"SELECT ?...", Args{}, "", "dali: ?... cannot be used in prepared statements"},
+	{"INSERT ?values", Args{}, "", "dali: ?values cannot be used in prepared statements"},
+	{"INSERT ?values...", Args{}, "", "dali: ?values... cannot be used in prepared statements"},
+	{"INSERT ?set", Args{}, "", "dali: ?set cannot be used in prepared statements"},
+}
+
+func TestPreparedStmts(t *testing.T) {
+	preproc := NewPreprocessor(FakeDialect{})
+	for _, tt := range preparedStmtTests {
+		str, err := preproc.ProcessPreparedStmt(tt.sql, tt.args)
+		var gotErr string
+		if err != nil {
+			gotErr = err.Error()
+		}
+		if gotErr != tt.wantErr {
+			var wantErr error
+			if tt.wantErr != "" {
+				wantErr = fmt.Errorf(tt.wantErr)
+			}
+			t.Errorf("%s:\ngot err: %v\n   want: %v", tt.sql, err, wantErr)
+		}
+		if str != tt.wantSQL {
+			t.Errorf("\n got: %v\nwant: %v", str, tt.wantSQL)
+		}
+	}
+}
+
 type NopDriver struct{}
 
-func (NopDriver) EscapeIdent(w io.Writer, ident string) {}
-func (NopDriver) EscapeBool(w io.Writer, v bool)        {}
-func (NopDriver) EscapeString(w io.Writer, s string)    {}
-func (NopDriver) EscapeBytes(w io.Writer, b []byte)     {}
-func (NopDriver) EscapeTime(w io.Writer, t time.Time)   {}
+func (NopDriver) EscapeIdent(w io.Writer, ident string)   {}
+func (NopDriver) EscapeBool(w io.Writer, v bool)          {}
+func (NopDriver) EscapeString(w io.Writer, s string)      {}
+func (NopDriver) EscapeBytes(w io.Writer, b []byte)       {}
+func (NopDriver) EscapeTime(w io.Writer, t time.Time)     {}
+func (NopDriver) PrintPlaceholderSign(w io.Writer, n int) {}
 
 var preproc = NewPreprocessor(NopDriver{})
 

@@ -18,11 +18,12 @@ func NewFakeDialect() *FakeDialect {
 	return &FakeDialect{}
 }
 
-func (FakeDialect) EscapeIdent(w io.Writer, ident string) { fmt.Fprintf(w, "{%s}", ident) }
-func (FakeDialect) EscapeBool(w io.Writer, v bool)        { fmt.Fprint(w, v) }
-func (FakeDialect) EscapeString(w io.Writer, s string)    { fmt.Fprintf(w, "'%s'", s) }
-func (FakeDialect) EscapeBytes(w io.Writer, b []byte)     { fmt.Fprintf(w, "`%s`", string(b)) }
-func (FakeDialect) EscapeTime(w io.Writer, t time.Time)   { fmt.Fprintf(w, "'%v'", t) }
+func (FakeDialect) EscapeIdent(w io.Writer, ident string)   { fmt.Fprintf(w, "{%s}", ident) }
+func (FakeDialect) EscapeBool(w io.Writer, v bool)          { fmt.Fprint(w, v) }
+func (FakeDialect) EscapeString(w io.Writer, s string)      { fmt.Fprintf(w, "'%s'", s) }
+func (FakeDialect) EscapeBytes(w io.Writer, b []byte)       { fmt.Fprintf(w, "`%s`", string(b)) }
+func (FakeDialect) EscapeTime(w io.Writer, t time.Time)     { fmt.Fprintf(w, "'%v'", t) }
+func (FakeDialect) PrintPlaceholderSign(w io.Writer, n int) { fmt.Fprintf(w, "&%d", n) }
 
 func (d *FakeDialect) Open(name string) (driver.Conn, error) { return FakeConn{d}, nil }
 

@@ -70,3 +70,7 @@ func (MySQL) EscapeTime(w io.Writer, t time.Time) {
 	writeString(w, t.Format(mysqlTimeFormat))
 	writeByte(w, '\'')
 }
+
+func (MySQL) PrintPlaceholderSign(w io.Writer, n int) {
+	writeByte(w, '?')
+}

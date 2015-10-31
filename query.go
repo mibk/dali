@@ -1,6 +1,9 @@
 package dali
 
-import "database/sql"
+import (
+	"database/sql"
+	"fmt"
+)
 
 // Query represents an arbitrary SQL statement.
 // The SQL is preprocessed by Preprocessor before running.
@@ -9,16 +12,16 @@ type Query struct {
 	preproc *Preprocessor
 	query   string
 	args    []interface{}
+	err     error
 }
 
 // Exec executes a query that doesn't return rows.
 // For example: INSERT or UPDATE.
 func (q *Query) Exec() (sql.Result, error) {
-	sql, err := q.process()
-	if err != nil {
-		return nil, err
+	if q.err != nil {
+		return nil, q.err
 	}
-	return q.execer.Exec(sql)
+	return q.execer.Exec(q.query, q.args...)
 }
 
 // MustExec is like Exec but panics on error.
@@ -32,11 +35,10 @@ func (q *Query) MustExec() sql.Result {
 
 // Rows executes a query that returns rows, typically a SELECT.
 func (q *Query) Rows() (*sql.Rows, error) {
-	sql, err := q.process()
-	if err != nil {
-		return nil, err
+	if q.err != nil {
+		return nil, q.err
 	}
-	return q.execer.Query(sql)
+	return q.execer.Query(q.query, q.args...)
 }
 
 // ScanRow executes a query that is expected to return at most one row.
@@ -45,22 +47,18 @@ func (q *Query) Rows() (*sql.Rows, error) {
 // ScanRow uses the first row and discards the rest. If no row matches
 // the query, ScanRow returns sql.ErrNoRows.
 func (q *Query) ScanRow(dest ...interface{}) error {
-	sql, err := q.process()
-	if err != nil {
-		return err
+	if q.err != nil {
+		return q.err
 	}
-	return q.execer.QueryRow(sql).Scan(dest...)
+	return q.execer.QueryRow(q.query, q.args...).Scan(dest...)
 }
 
 func (q *Query) String() string {
-	sql, err := q.process()
-	if err != nil {
-		panic(err)
+	if q.err != nil {
+		panic(q.err)
 	}
-	return sql
-}
-
-// process returns a preprocessed SQL query.
-func (q *Query) process() (sql string, err error) {
-	return q.preproc.Process(q.query, q.args)
+	if q.args != nil {
+		return fmt.Sprintf("%s /* args: %v */", q.query, q.args)
+	}
+	return q.query
 }

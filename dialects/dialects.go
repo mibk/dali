@@ -11,6 +11,8 @@ type Dialect interface {
 	EscapeString(w io.Writer, s string)
 	EscapeBytes(w io.Writer, b []byte)
 	EscapeTime(w io.Writer, t time.Time)
+	// Prints nth placeholder sign starting from 1.
+	PrintPlaceholderSign(w io.Writer, n int)
 }
 
 func writeByte(w io.Writer, b byte) (n int, err error) {

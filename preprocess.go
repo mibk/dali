@@ -32,9 +32,37 @@ func NewPreprocessor(dialect dialects.Dialect) *Preprocessor {
 // Process processes the sql and the args. It returns the resulting SQL query and
 // an error if there is one.
 func (p *Preprocessor) Process(sql string, args []interface{}) (string, error) {
+	pp := &preprocessor{Preprocessor: p, args: args}
+	return pp.process(sql)
+}
+
+func (p *Preprocessor) ProcessPreparedStmt(sql string, args []interface{}) (string, error) {
+	pp := &preprocessor{Preprocessor: p, args: args, isPreparedStmt: true}
+	return pp.process(sql)
+}
+
+// preprocessor represents a single preprocessing.
+type preprocessor struct {
+	*Preprocessor
+	isPreparedStmt bool
+	err            error
+	args           []interface{}
+	// Index of the current arg.
+	index int
+	// Holds the placeholder index.
+	param int
+}
+
+func (p *preprocessor) checkInterpolationOf(placeholder string) error {
+	if p.isPreparedStmt {
+		return fmt.Errorf("dali: %s cannot be used in prepared statements", placeholder)
+	}
+	return nil
+}
+
+func (p *preprocessor) process(sql string) (string, error) {
 	b := new(bytes.Buffer)
 	pos := 0
-	argIndex := 0
 	for pos < len(sql) {
 		r, w := utf8.DecodeRuneInString(sql[pos:])
 		pos += w
@@ -63,30 +91,42 @@ func (p *Preprocessor) Process(sql string, args []interface{}) (string, error) {
 				pos += w
 				end = pos
 			}
-			if argIndex >= len(args) {
-				return "", fmt.Errorf("dali: there is not enough args for placeholders")
-			}
-			if err := p.interpolate(b, sql[start:end], expand, args[argIndex]); err != nil {
+			if err := p.interpolate(b, sql[start:end], expand); err != nil {
 				return "", err
 			}
-			argIndex++
 		default:
 			b.WriteRune(r)
 		}
 	}
-	if argIndex < len(args) {
-		return "", fmt.Errorf("dali: only %d args are expected", argIndex)
+	if p.index < len(p.args) {
+		return "", fmt.Errorf("dali: only %d args are expected", p.index)
 	}
 	return b.String(), nil
 }
 
-func (p *Preprocessor) interpolate(b *bytes.Buffer, typ string, expand bool, v interface{}) error {
+func (p *preprocessor) nextArg() interface{} {
+	if p.index >= len(p.args) {
+		p.try(fmt.Errorf("dali: there is not enough args for placeholders"))
+		return nil
+	}
+	v := p.args[p.index]
+	p.index++
+	return v
+}
+
+func (p *preprocessor) nextParamNumber() int {
+	p.param++
+	return p.param
+}
+
+func (p *preprocessor) interpolate(b *bytes.Buffer, typ string, expand bool) error {
 	if expand {
 		switch typ {
 		case "":
-			return p.escapeMultipleValues(b, v)
+			p.try(p.checkInterpolationOf("?..."))
+			p.try(p.escapeMultipleValues(b, p.nextArg()))
 		case "ident":
-			idents, ok := v.([]string)
+			idents, ok := p.nextArg().([]string)
 			if !ok {
 				return fmt.Errorf("dali: ?ident... expects the argument to be a []string")
 			}
@@ -97,36 +137,50 @@ func (p *Preprocessor) interpolate(b *bytes.Buffer, typ string, expand bool, v i
 				}
 			}
 		case "values":
-			return p.printMultiValuesClause(b, v)
+			p.try(p.checkInterpolationOf("?values..."))
+			p.try(p.printMultiValuesClause(b, p.nextArg()))
 		default:
 			return fmt.Errorf("dali: ?%s cannot be expanded (...) or doesn't exist", typ)
 		}
 	} else {
 		switch typ {
 		case "":
-			return p.escapeValue(b, v)
+			if p.isPreparedStmt {
+				p.dialect.PrintPlaceholderSign(b, p.nextParamNumber())
+				return nil
+			}
+			p.try(p.escapeValue(b, p.nextArg()))
 		case "ident":
-			ident, ok := v.(string)
+			ident, ok := p.nextArg().(string)
 			if !ok {
-				return fmt.Errorf("dali: ?ident expects the argument to be a string")
+				return p.try(
+					fmt.Errorf("dali: ?ident expects the argument to be a string"))
 			}
 			p.dialect.EscapeIdent(b, ident)
 		case "values":
-			return p.printValuesClause(b, v)
+			p.try(p.checkInterpolationOf("?values"))
+			p.try(p.printValuesClause(b, p.nextArg()))
 		case "set":
-			return p.printSetClause(b, v)
+			p.try(p.checkInterpolationOf("?set"))
+			p.try(p.printSetClause(b, p.nextArg()))
 		case "raw":
-			raw, ok := v.(string)
+			raw, ok := p.nextArg().(string)
 			if !ok {
-				return fmt.Errorf("dali: ?raw expects the argument to be a string")
+				return p.try(fmt.Errorf("dali: ?raw expects the argument to be a string"))
 			}
-			_, err := b.WriteString(raw)
-			return err
+			b.WriteString(raw)
 		default:
 			return fmt.Errorf("dali: unknown placeholder ?%s", typ)
 		}
 	}
-	return nil
+	return p.err
+}
+
+func (p *preprocessor) try(err error) error {
+	if p.err == nil {
+		p.err = err
+	}
+	return p.err
 }
 
 func (p *Preprocessor) escapeValue(b *bytes.Buffer, v interface{}) error {

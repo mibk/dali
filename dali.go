@@ -73,12 +73,37 @@ func (db *DB) Ping() error {
 // which is capable of executing the sql (given by the query and
 // the args) or loading the result into structs or primitive values.
 func (db *DB) Query(query string, args ...interface{}) *Query {
+	sql, err := db.preproc.Process(query, args)
 	return &Query{
 		execer:  db.DB,
 		preproc: db.preproc,
-		query:   query,
-		args:    args,
+		query:   sql,
+		err:     err,
 	}
+}
+
+// Prepare creates a prepared statement for later queries or executions.
+// The caller must call the statement's Close method
+// when the statement is no longer needed.
+func (db *DB) Prepare(query string, args ...interface{}) (*Stmt, error) {
+	sql, err := db.preproc.ProcessPreparedStmt(query, args)
+	if err != nil {
+		return nil, err
+	}
+	stmt, err := db.DB.Prepare(sql)
+	if err != nil {
+		return nil, err
+	}
+	return &Stmt{stmt, db.preproc, sql}, nil
+}
+
+// MustPrepare is like Prepare but panics on error.
+func (db *DB) MustPrepare(query string, args ...interface{}) *Stmt {
+	s, err := db.Prepare(query, args...)
+	if err != nil {
+		panic(err)
+	}
+	return s
 }
 
 // Begin starts a transaction. The isolation level is dependent on
