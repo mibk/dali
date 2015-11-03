@@ -66,6 +66,18 @@ var placeholderTests = []struct {
 		"INSERT ({name}, {age}) VALUES ('John', 21)"},
 	{"INSERT ?values", Args{Omit2{Name: "Rudolf", Age: 28}},
 		"INSERT ({name}, {age}) VALUES ('Rudolf', 28)"},
+
+	// only specified columns
+	{"INSERT ?values", Args{OnlyCols(Omit{Name: "David"}, "name")},
+		"INSERT ({name}) VALUES ('David')"},
+	{"INSERT ?values", Args{OnlyCols(Omit{Name: "David", Age: 23}, "name", "age")},
+		"INSERT ({name}, {age}) VALUES ('David', 23)"},
+	{"UPDATE ?set", Args{OnlyCols(Omit{Name: "David"}, "name")},
+		"UPDATE SET {name} = 'David'"},
+	{"INSERT ?values...", Args{OnlyCols([]Omit{{Name: "David"}, {Name: "Rick"}}, "name")},
+		"INSERT ({name}) VALUES ('David'), ('Rick')"},
+	{"INSERT ?values", Args{OnlyCols(Map{"id": 3, "name": "Frank"}, "name")},
+		"INSERT ({name}) VALUES ('Frank')"},
 }
 
 func TestPlaceholders(t *testing.T) {
@@ -187,6 +199,11 @@ var errorTests = []struct {
 	{"INSERT ?values...", Args{[]struct{}{struct{}{}}}, "dali: no columns derived from []struct {}"},
 	{"INSERT ?values", Args{OmitEverything{}}, "dali: no columns derived from dali.OmitEverything"},
 	{"INSERT ?set", Args{struct{}{}}, "dali: no columns derived from struct {}"},
+
+	// only specified columns
+	{"INSERT ?values", Args{OnlyCols(Map{"name": "Albert"}, "first_name")},
+		"dali: only cols: first_name not present in the Map"},
+	{"INSERT ?values", Args{OnlyCols(User{})}, "dali: no columns passed to OnlyCols"},
 }
 
 func TestErrors(t *testing.T) {

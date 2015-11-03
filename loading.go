@@ -76,7 +76,7 @@ func (q *Query) load(v reflect.Value, elemt reflect.Type, loadJustOne, isPtr boo
 	if err != nil {
 		return err
 	}
-	cols, indexes := q.preproc.colNamesAndFieldIndexes(elemt, false)
+	cols, indexes := q.preproc.colNamesAndFieldIndexes(elemt, false, nil)
 	fieldIndexes := make([][]int, len(rowCols))
 	for coln, rowCol := range rowCols {
 		var index []int
