@@ -279,16 +279,16 @@ func TestPreparedStmts(t *testing.T) {
 	}
 }
 
-type NopDriver struct{}
+type NopDialect struct{}
 
-func (NopDriver) EscapeIdent(w io.Writer, ident string)   {}
-func (NopDriver) EscapeBool(w io.Writer, v bool)          {}
-func (NopDriver) EscapeString(w io.Writer, s string)      {}
-func (NopDriver) EscapeBytes(w io.Writer, b []byte)       {}
-func (NopDriver) EscapeTime(w io.Writer, t time.Time)     {}
-func (NopDriver) PrintPlaceholderSign(w io.Writer, n int) {}
+func (NopDialect) EscapeIdent(w io.Writer, ident string)   {}
+func (NopDialect) EscapeBool(w io.Writer, v bool)          {}
+func (NopDialect) EscapeString(w io.Writer, s string)      {}
+func (NopDialect) EscapeBytes(w io.Writer, b []byte)       {}
+func (NopDialect) EscapeTime(w io.Writer, t time.Time)     {}
+func (NopDialect) PrintPlaceholderSign(w io.Writer, n int) {}
 
-var preproc = NewPreprocessor(NopDriver{})
+var preproc = NewPreprocessor(NopDialect{})
 
 func init() {
 	preproc.setMapperFunc(func(s string) string { return s })
