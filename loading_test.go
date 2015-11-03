@@ -203,6 +203,33 @@ func TestErrNoRows(t *testing.T) {
 
 }
 
+func TestEmptyColumns(t *testing.T) {
+	tests := []struct {
+		cols   []string
+		result []interface{}
+		v      interface{} // value to load
+		method func(q *Query, dest interface{}) error
+		expErr string
+	}{
+		{cols("ID", "Name"), result(U{2, "Caroline"}, U{3, "Mark"}, U{4, "Lucas"}),
+			newTypeOf(V{}), (*Query).One,
+			"dali: no match between columns and struct fields"}, // #1
+		{cols("ID", "Name"), result(U{2, "Caroline"}, U{3, "Mark"}, U{4, "Lucas"}),
+			newTypeOf([]V{}), (*Query).All,
+			"dali: no match between columns and struct fields"},
+	}
+
+	for i, tt := range tests {
+		dvr.SetColumns(tt.cols...).SetResult(tt.result...)
+		err := tt.method(db.Query(""), tt.v)
+		if err == nil {
+			t.Errorf("#%d: error was expected but none given", i+1)
+		} else if err.Error() != tt.expErr {
+			t.Errorf("#%d\n got: %v\nwant: %v", i+1, err, tt.expErr)
+		}
+	}
+}
+
 func newTypeOf(v interface{}) interface{}   { return reflect.New(reflect.TypeOf(v)).Interface() }
 func cols(s ...string) []string             { return s }
 func result(v ...interface{}) []interface{} { return v }

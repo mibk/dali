@@ -337,7 +337,9 @@ func (p *Preprocessor) deriveColsAndVals(v interface{}) (cols []string, vals []i
 		var indexes [][]int
 		cols, indexes = p.colNamesAndFieldIndexes(vv.Type(), true)
 		vals = valuesByFieldIndexes(vv, indexes)
-
+	}
+	if len(cols) == 0 {
+		err = errNoCols(v)
 	}
 	return
 }
@@ -361,6 +363,9 @@ func (p *Preprocessor) printMultiValuesClause(b *bytes.Buffer, v interface{}) er
 		return fmt.Errorf("dali: empty slice passed to ?values...")
 	}
 	cols, indexes := p.colNamesAndFieldIndexes(el, true)
+	if len(cols) == 0 {
+		return errNoCols(v)
+	}
 	b.WriteRune('(')
 	for i, c := range cols {
 		p.dialect.EscapeIdent(b, c)
@@ -388,6 +393,10 @@ func (p *Preprocessor) printMultiValuesClause(b *bytes.Buffer, v interface{}) er
 		}
 	}
 	return nil
+}
+
+func errNoCols(v interface{}) error {
+	return fmt.Errorf("dali: no columns derived from %T", v)
 }
 
 // colNamesAndFieldIndexes derives column names from a struct type and returns

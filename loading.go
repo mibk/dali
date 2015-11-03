@@ -2,6 +2,7 @@ package dali
 
 import (
 	"database/sql"
+	"fmt"
 	"reflect"
 )
 
@@ -97,12 +98,17 @@ func (q *Query) load(v reflect.Value, elemt reflect.Type, loadJustOne, isPtr boo
 		elemvptr := reflect.New(elemt)
 		elemv := reflect.Indirect(elemvptr)
 
+		noMatch := true
 		for i, index := range fieldIndexes {
 			if index == nil {
 				fields[i] = &ignoreField
 				continue
 			}
+			noMatch = false
 			fields[i] = elemv.FieldByIndex(index).Addr().Interface()
+		}
+		if noMatch {
+			return fmt.Errorf("dali: no match between columns and struct fields")
 		}
 		if err := rows.Scan(fields...); err != nil {
 			return err

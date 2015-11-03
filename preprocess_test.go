@@ -150,6 +150,11 @@ type VS struct {
 	Scan Scan
 }
 
+type OmitEverything struct {
+	A string `db:"-"`
+	B string `db:",omitinsert"`
+}
+
 var errorTests = []struct {
 	sql  string
 	args []interface{}
@@ -175,6 +180,13 @@ var errorTests = []struct {
 	{"INSERT ?values...", Args{[]string{}},
 		"dali: ?values... expects the argument to be a slice of structs"},
 	{"INSERT ?values...", Args{[]User{}}, "dali: empty slice passed to ?values..."},
+
+	// empty columns
+	{"INSERT ?values", Args{Map{}}, "dali: no columns derived from dali.Map"},
+	{"INSERT ?values", Args{struct{}{}}, "dali: no columns derived from struct {}"},
+	{"INSERT ?values...", Args{[]struct{}{struct{}{}}}, "dali: no columns derived from []struct {}"},
+	{"INSERT ?values", Args{OmitEverything{}}, "dali: no columns derived from dali.OmitEverything"},
+	{"INSERT ?set", Args{struct{}{}}, "dali: no columns derived from struct {}"},
 }
 
 func TestErrors(t *testing.T) {
