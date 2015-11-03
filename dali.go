@@ -18,7 +18,7 @@ type DB struct {
 // NewDB instantiates DB from the given database/sql DB handle
 // in the particular dialect.
 func NewDB(db *sql.DB, dialect dialects.Dialect) *DB {
-	return &DB{db, NewPreprocessor(dialect)}
+	return &DB{db, NewPreprocessor(dialect, ToUnderscore)}
 }
 
 // Open opens a database by calling sql.Open. It returns a new DB and

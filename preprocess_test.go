@@ -69,7 +69,7 @@ var placeholderTests = []struct {
 }
 
 func TestPlaceholders(t *testing.T) {
-	preproc := NewPreprocessor(FakeDialect{})
+	preproc := NewPreprocessor(FakeDialect{}, ToUnderscore)
 	for _, tt := range placeholderTests {
 		str, err := preproc.Process(tt.sql, tt.args)
 		if err != nil {
@@ -170,7 +170,7 @@ var errorTests = []struct {
 }
 
 func TestErrors(t *testing.T) {
-	preproc := NewPreprocessor(FakeDialect{})
+	preproc := NewPreprocessor(FakeDialect{}, ToUnderscore)
 	for _, tt := range errorTests {
 		_, err := preproc.Process(tt.sql, tt.args)
 		if err == nil {
@@ -219,7 +219,7 @@ var typesTests = []struct {
 }
 
 func TestPreprocessingTypes(t *testing.T) {
-	preproc := NewPreprocessor(FakeDialect{})
+	preproc := NewPreprocessor(FakeDialect{}, ToUnderscore)
 	preproc.setMapperFunc(func(s string) string { return s })
 	for _, tt := range typesTests {
 		str, err := preproc.Process(tt.sql, tt.args)
@@ -259,7 +259,7 @@ var preparedStmtTests = []struct {
 }
 
 func TestPreparedStmts(t *testing.T) {
-	preproc := NewPreprocessor(FakeDialect{})
+	preproc := NewPreprocessor(FakeDialect{}, ToUnderscore)
 	for _, tt := range preparedStmtTests {
 		str, err := preproc.ProcessPreparedStmt(tt.sql, tt.args)
 		var gotErr string
@@ -288,7 +288,7 @@ func (NopDialect) EscapeBytes(w io.Writer, b []byte)       {}
 func (NopDialect) EscapeTime(w io.Writer, t time.Time)     {}
 func (NopDialect) PrintPlaceholderSign(w io.Writer, n int) {}
 
-var preproc = NewPreprocessor(NopDialect{})
+var preproc = NewPreprocessor(NopDialect{}, ToUnderscore)
 
 func init() {
 	preproc.setMapperFunc(func(s string) string { return s })

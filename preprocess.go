@@ -24,9 +24,11 @@ type Preprocessor struct {
 	mapperFunc func(string) string
 }
 
-// NewPreprocessor creates a new Preprocessor.
-func NewPreprocessor(dialect dialects.Dialect) *Preprocessor {
-	return &Preprocessor{dialect, ToUnderscore}
+// NewPreprocessor creates a new Preprocessor. Processing is done
+// in the given dialect and mapperFunc is used when transforming
+// structs' field names to column names.
+func NewPreprocessor(dialect dialects.Dialect, mapperFunc func(string) string) *Preprocessor {
+	return &Preprocessor{dialect, mapperFunc}
 }
 
 // Process processes the sql and the args. It returns the resulting SQL query and
