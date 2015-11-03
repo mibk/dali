@@ -9,19 +9,19 @@ import (
 )
 
 var (
-	dvr  *FakeDialect
-	conn *DB
+	dvr *FakeDialect
+	db  *DB
 )
 
 func init() {
 	dvr = NewFakeDialect()
 	sql.Register("dali", dvr)
-	db, err := sql.Open("dali", "")
+	dbHandle, err := sql.Open("dali", "")
 	if err != nil {
 		panic(err)
 	}
-	conn = NewDBFromHandler(db, dvr)
-	conn.SetMapperFunc(func(s string) string { return s })
+	db = NewDB(dbHandle, dvr)
+	db.SetMapperFunc(func(s string) string { return s })
 }
 
 func TestScanRow(t *testing.T) {
@@ -30,12 +30,12 @@ func TestScanRow(t *testing.T) {
 		name string
 	)
 	dvr.SetColumns("ID").SetResult(U{1, "John"})
-	conn.Query("").ScanRow(&id)
+	db.Query("").ScanRow(&id)
 	if id != 1 {
 		t.Errorf("id: got %v, want %v", id, 1)
 	}
 	dvr.SetColumns("Name").SetResult(U{1, "John"})
-	conn.Query("").ScanRow(&name)
+	db.Query("").ScanRow(&name)
 	if name != "John" {
 		t.Errorf("name: got %v, want %v", name, "John")
 	}
@@ -107,7 +107,7 @@ func Test_One_and_All(t *testing.T) {
 
 	for _, tt := range tests {
 		dvr.SetColumns(tt.cols...).SetResult(tt.result...)
-		if err := tt.method(conn.Query(""), tt.v); err != nil {
+		if err := tt.method(db.Query(""), tt.v); err != nil {
 			panic(err)
 		}
 		vv := reflect.ValueOf(tt.v)
@@ -182,7 +182,7 @@ func TestLoading_Types(t *testing.T) {
 
 	for _, tt := range tests {
 		dvr.SetColumns("A").SetResult(tt.result...)
-		if err := conn.Query("").ScanRow(tt.v); err != nil {
+		if err := db.Query("").ScanRow(tt.v); err != nil {
 			panic(err)
 		}
 		vv := reflect.ValueOf(tt.v)
@@ -197,7 +197,7 @@ func TestLoading_Types(t *testing.T) {
 func TestErrNoRows(t *testing.T) {
 	var u U
 	dvr.SetResult()
-	if err := conn.Query("").One(&u); err != sql.ErrNoRows {
+	if err := db.Query("").One(&u); err != sql.ErrNoRows {
 		t.Errorf("Query.One should return sql.ErrNoRows if there are no rows\ngot %v", err)
 	}
 
@@ -212,7 +212,7 @@ func BenchmarkLoadingOne(b *testing.B) {
 	b.ResetTimer()
 	var u U
 	for i := 0; i < b.N; i++ {
-		conn.Query("").One(&u)
+		db.Query("").One(&u)
 	}
 }
 
@@ -221,6 +221,6 @@ func BenchmarkLoadingAll(b *testing.B) {
 	b.ResetTimer()
 	var u []U
 	for i := 0; i < b.N; i++ {
-		conn.Query("").All(&u)
+		db.Query("").All(&u)
 	}
 }

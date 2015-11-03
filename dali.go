@@ -15,9 +15,9 @@ type DB struct {
 	preproc *Preprocessor
 }
 
-// NewDBFromHandler instantiates DB from the given database/sql DB handler
+// NewDB instantiates DB from the given database/sql DB handle
 // in the particular dialect.
-func NewDBFromHandler(db *sql.DB, dialect dialects.Dialect) *DB {
+func NewDB(db *sql.DB, dialect dialects.Dialect) *DB {
 	return &DB{db, NewPreprocessor(dialect)}
 }
 
@@ -36,26 +36,26 @@ func Open(driverName, dataSourceName string) (*DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	return NewDBFromHandler(db, dialect), nil
+	return NewDB(db, dialect), nil
 }
 
 // MustOpen is like Open but panics on error.
 func MustOpen(driverName, dataSourceName string) *DB {
-	conn, err := Open(driverName, dataSourceName)
+	db, err := Open(driverName, dataSourceName)
 	if err != nil {
 		panic(err)
 	}
-	return conn
+	return db
 }
 
 // MustOpenAndVerify is like MustOpen but it verifies the connection and
 // panics on error.
 func MustOpenAndVerify(driverName, dataSourceName string) *DB {
-	conn := MustOpen(driverName, dataSourceName)
-	if err := conn.Ping(); err != nil {
+	db := MustOpen(driverName, dataSourceName)
+	if err := db.Ping(); err != nil {
 		panic(err)
 	}
-	return conn
+	return db
 }
 
 // Close closes the database, releasing any open resources.
