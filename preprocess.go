@@ -131,6 +131,8 @@ func (p *preprocessor) interpolate(b *bytes.Buffer, typ string, expand bool) err
 			idents, ok := p.nextArg().([]string)
 			if !ok {
 				return fmt.Errorf("dali: ?ident... expects the argument to be a []string")
+			} else if len(idents) == 0 {
+				return fmt.Errorf("dali: empty slice passed to ?ident...")
 			}
 			for i, ident := range idents {
 				p.dialect.EscapeIdent(b, ident)
@@ -257,6 +259,9 @@ func (p *Preprocessor) escapeMultipleValues(b *bytes.Buffer, v interface{}) erro
 		return fmt.Errorf("dali: ?... expects the argument to be a slice")
 	}
 	length := vv.Len()
+	if length == 0 {
+		return fmt.Errorf("dali: empty slice passed to ?...")
+	}
 	for i := 0; i < length; i++ {
 		if err := p.escapeValue(b, vv.Index(i).Interface()); err != nil {
 			return err
@@ -351,6 +356,9 @@ func (p *Preprocessor) printMultiValuesClause(b *bytes.Buffer, v interface{}) er
 	}
 	if el.Kind() != reflect.Struct {
 		return errInvalidArg
+	}
+	if vv.Len() == 0 {
+		return fmt.Errorf("dali: empty slice passed to ?values...")
 	}
 	cols, indexes := p.colNamesAndFieldIndexes(el, true)
 	b.WriteRune('(')

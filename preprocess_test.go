@@ -167,6 +167,14 @@ var errorTests = []struct {
 	{"INSERT ?values", Args{ptrPtrUser()}, "dali: argument must be a pointer to a struct"},
 	{"INSERT ?values...", Args{[]**User{}},
 		"dali: ?values... expects the argument to be a slice of structs"},
+
+	// empty slice
+	{"INSERT ?...", Args{[]string{}}, "dali: empty slice passed to ?..."},
+	{"SELECT ?ident...", Args{[]int{}}, "dali: ?ident... expects the argument to be a []string"},
+	{"SELECT ?ident...", Args{[]string{}}, "dali: empty slice passed to ?ident..."},
+	{"INSERT ?values...", Args{[]string{}},
+		"dali: ?values... expects the argument to be a slice of structs"},
+	{"INSERT ?values...", Args{[]User{}}, "dali: empty slice passed to ?values..."},
 }
 
 func TestErrors(t *testing.T) {
