@@ -12,11 +12,12 @@ type Tx struct {
 
 // Query is a (*DB).Query equivalent for transactions.
 func (tx *Tx) Query(query string, args ...interface{}) *Query {
+	sql, err := tx.db.preproc.Process(query, args)
 	return &Query{
 		execer:  tx.Tx,
 		preproc: tx.db.preproc,
-		query:   query,
-		args:    args,
+		query:   sql,
+		err:     err,
 	}
 }
 
@@ -24,7 +25,7 @@ func (tx *Tx) Query(query string, args ...interface{}) *Query {
 // The caller must call the statement's Close method
 // when the statement is no longer needed.
 func (tx *Tx) Prepare(query string, args ...interface{}) (*Stmt, error) {
-	sql, err := tx.db.preproc.Process(query, args)
+	sql, err := tx.db.preproc.ProcessPreparedStmt(query, args)
 	if err != nil {
 		return nil, err
 	}
