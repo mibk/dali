@@ -119,6 +119,15 @@ func (db *DB) Begin() (*Tx, error) {
 	}, nil
 }
 
+// MustBegin is like Begin but panics on error.
+func (db *DB) MustBegin() *Tx {
+	tx, err := db.Begin()
+	if err != nil {
+		panic(err)
+	}
+	return tx
+}
+
 // SetMapperFunc sets a mapper func which is used when deriving
 // column names from field names. If none is set, ToUnderscore
 // func is used.
