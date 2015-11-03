@@ -45,11 +45,11 @@ var placeholderTests = []struct {
 	{"INSERT ?values", Args{V{1, "Syd"}},
 		"INSERT ({V_name}) VALUES ('Syd')"},
 
-	// nested structs
+	// embedded structs
 	{"INSERT ?values", Args{E{1, Name{"John", "Doe"}}},
 		"INSERT ({id}, {first}, {last}) VALUES (1, 'John', 'Doe')"},
 
-	// ignored nested structs
+	// ignored embedded structs
 	{"?values", Args{SpecialStruct{"Waking up", parseTime("2015-04-05 06:07:08"), NullTime{}}},
 		"({event}, {started}, {finished}) VALUES ('Waking up', " +
 			"'2015-04-05 06:07:08 +0000 UTC', NULL)"},

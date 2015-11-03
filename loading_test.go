@@ -73,13 +73,13 @@ func Test_One_and_All(t *testing.T) {
 			U{1, "Thomas"},
 		},
 
-		// nested structs
+		// embedded structs
 		{cols("ID", "First", "Last"), result(Eres{1, "Thomas", "Shoe"}, Eres{4, "Bob", "Webber"}),
 			newTypeOf([]E{}), (*Query).All,
 			[]E{{1, Name{"Thomas", "Shoe"}}, {4, Name{"Bob", "Webber"}}},
 		},
 
-		// ignored nested structs
+		// ignored embedded structs
 		{cols("Event", "Started", "Finished"), result(SpecialStructRes{"Lunch",
 			parseTime("2015-05-05 12:24:32"), nil}),
 			newTypeOf(SpecialStruct{}), (*Query).One,

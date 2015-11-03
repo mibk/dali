@@ -396,10 +396,10 @@ func (p *Preprocessor) printMultiValuesClause(b *bytes.Buffer, v interface{}) er
 // fields having the omitinsert property are ignored as well.
 func (p *Preprocessor) colNamesAndFieldIndexes(typ reflect.Type, insert bool) (
 	cols []string, indexes [][]int) {
-	return p.colNamesAndFieldIndexesOfNested(typ, []int{}, insert)
+	return p.colNamesAndFieldIndexesOfEmbedded(typ, []int{}, insert)
 }
 
-func (p *Preprocessor) colNamesAndFieldIndexesOfNested(typ reflect.Type, index []int, insert bool) (
+func (p *Preprocessor) colNamesAndFieldIndexesOfEmbedded(typ reflect.Type, index []int, insert bool) (
 	cols []string, indexes [][]int) {
 
 	for i := 0; i < typ.NumField(); i++ {
@@ -417,7 +417,7 @@ func (p *Preprocessor) colNamesAndFieldIndexesOfNested(typ reflect.Type, index [
 				reflect.PtrTo(f.Type).Implements(scannerInterface)):
 				break
 			default:
-				emCols, emIndexes := p.colNamesAndFieldIndexesOfNested(f.Type,
+				emCols, emIndexes := p.colNamesAndFieldIndexesOfEmbedded(f.Type,
 					append(index, i), insert)
 				cols = append(cols, emCols...)
 				indexes = append(indexes, emIndexes...)
