@@ -11,14 +11,19 @@ import (
 // is Query which provides methods for executing queries
 // or scanning results.
 type DB struct {
-	DB      *sql.DB
-	preproc *Preprocessor
+	DB         *sql.DB
+	preproc    *Preprocessor
+	middleware func(Execer) Execer
 }
 
 // NewDB instantiates DB from the given database/sql DB handle
 // in the particular dialect.
 func NewDB(db *sql.DB, dialect dialects.Dialect) *DB {
-	return &DB{db, NewPreprocessor(dialect, ToUnderscore)}
+	return &DB{
+		DB:         db,
+		preproc:    NewPreprocessor(dialect, ToUnderscore),
+		middleware: func(e Execer) Execer { return e },
+	}
 }
 
 // Open opens a database by calling sql.Open. It returns a new DB and
@@ -75,7 +80,7 @@ func (db *DB) Ping() error {
 func (db *DB) Query(query string, args ...interface{}) *Query {
 	sql, err := db.preproc.Process(query, args)
 	return &Query{
-		execer:  db.DB,
+		execer:  db.middleware(db.DB),
 		preproc: db.preproc,
 		query:   sql,
 		err:     err,
@@ -94,7 +99,7 @@ func (db *DB) Prepare(query string, args ...interface{}) (*Stmt, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Stmt{stmt, db.preproc, sql}, nil
+	return &Stmt{stmt, db, sql}, nil
 }
 
 // MustPrepare is like Prepare but panics on error.
@@ -135,7 +140,16 @@ func (db *DB) SetMapperFunc(f func(string) string) {
 	db.preproc.setMapperFunc(f)
 }
 
-type execer interface {
+// SetMiddlewareFunc changes the DB middleware func. Default func
+// passes the Execer unchanged. SetMiddlewareFunc allowes the user
+// to set his own middleware to perform additional operations (e.g.
+// profiling) when executing queries.
+func (db *DB) SetMiddlewareFunc(f func(Execer) Execer) {
+	db.middleware = f
+}
+
+// Execer is an interface that Query works with.
+type Execer interface {
 	Exec(query string, args ...interface{}) (sql.Result, error)
 	Query(query string, args ...interface{}) (*sql.Rows, error)
 	QueryRow(query string, args ...interface{}) *sql.Row

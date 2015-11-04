@@ -4,15 +4,15 @@ import "database/sql"
 
 // Stmt is a prepared statement.
 type Stmt struct {
-	stmt    *sql.Stmt
-	preproc *Preprocessor
-	sql     string
+	stmt *sql.Stmt
+	db   *DB
+	sql  string
 }
 
 func (s *Stmt) Bind(args ...interface{}) *Query {
 	return &Query{
-		execer:  stmtExecer{s.stmt},
-		preproc: s.preproc,
+		execer:  s.db.middleware(stmtExecer{s.stmt}),
+		preproc: s.db.preproc,
 		query:   s.sql,
 		args:    args,
 	}
@@ -27,7 +27,7 @@ func (s *Stmt) String() string {
 	return s.sql
 }
 
-// stmtExecer is just an adapter for execer interface.
+// stmtExecer is just an adapter for Execer interface.
 type stmtExecer struct {
 	stmt *sql.Stmt
 }

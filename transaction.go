@@ -14,7 +14,7 @@ type Tx struct {
 func (tx *Tx) Query(query string, args ...interface{}) *Query {
 	sql, err := tx.db.preproc.Process(query, args)
 	return &Query{
-		execer:  tx.Tx,
+		execer:  tx.db.middleware(tx.Tx),
 		preproc: tx.db.preproc,
 		query:   sql,
 		err:     err,
@@ -33,7 +33,7 @@ func (tx *Tx) Prepare(query string, args ...interface{}) (*Stmt, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Stmt{stmt, tx.db.preproc, sql}, nil
+	return &Stmt{stmt, tx.db, sql}, nil
 }
 
 // MustPrepare is like Prepare but panics on error.

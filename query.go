@@ -8,7 +8,7 @@ import (
 // Query represents an arbitrary SQL statement.
 // The SQL is preprocessed by Preprocessor before running.
 type Query struct {
-	execer  execer
+	execer  Execer
 	preproc *Preprocessor
 	query   string
 	args    []interface{}
