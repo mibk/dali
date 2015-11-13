@@ -23,40 +23,33 @@ func (q *Query) One(dest interface{}) error {
 	return q.loadStruct(v)
 }
 
-// All executes a query that returns rows and loads the resulting
-// data into dest which could be either a slice of structs, or
-// a slice of primitive types.
-//
-// If the slice element is a primitive type, query is expected
-// to return only 1 column for each row. dest is the filled
-// with these values.
-//
-// If it is a struct, only fields that match the column names
-// (after filtering through the mapperFunc) are filled.
+// All executes the query that should return rows, and loads the
+// resulting data into dest which must be a slice of structs.
+// Only fields that match the column names (after filtering through
+// the mapperFunc) are filled.
 func (q *Query) All(dest interface{}) error {
+	const errMsg = "dali: dest must be a pointer to a slice of structs or pointers to structs"
 	destv := reflect.ValueOf(dest)
 	if destv.Kind() != reflect.Ptr {
-		panic("dali: dest must be a pointer to a slice")
+		panic(errMsg)
 	}
 	slicev := reflect.Indirect(destv)
 	if slicev.Kind() != reflect.Slice {
-		panic("dali: dest must be a pointer to a slice")
+		panic(errMsg)
 	}
 
 	elemt := slicev.Type().Elem()
-	origint := elemt
 	isPtr := false
 	if isPtr = elemt.Kind() == reflect.Ptr; isPtr {
 		elemt = elemt.Elem()
 	}
 	switch elemt.Kind() {
 	case reflect.Ptr:
-		panic("dali: a pointer to a pointer is not allowed as an element of a slice")
+		panic("dali: a pointer to a pointer is not allowed as an element of dest")
 	case reflect.Struct:
 		return q.loadStructs(slicev, elemt, isPtr)
-	default:
-		return q.loadValues(slicev, origint)
 	}
+	panic(errMsg)
 }
 
 func (q *Query) loadStruct(v reflect.Value) error { return q.load(v, v.Type(), true, false) }
@@ -134,18 +127,41 @@ func (q *Query) load(v reflect.Value, elemt reflect.Type, loadJustOne, isPtr boo
 
 var ignoreField interface{}
 
-func (q *Query) loadValues(slicev reflect.Value, elemt reflect.Type) error {
+// ScanRows executes the query that is expected to return rows.
+// It copies the columns from the matched rows into the slices
+// pointed at by dests.
+func (q *Query) ScanRows(dests ...interface{}) error {
+	slicevals := make([]reflect.Value, len(dests))
+	elemtypes := make([]reflect.Type, len(dests))
+	for i, dests := range dests {
+		destv := reflect.ValueOf(dests)
+		if destv.Kind() != reflect.Ptr {
+			panic("dali: dests must be a pointer to a slice")
+		}
+		slicevals[i] = reflect.Indirect(destv)
+		if slicevals[i].Kind() != reflect.Slice {
+			panic("dali: dests must be a pointer to a slice")
+		}
+		elemtypes[i] = slicevals[i].Type().Elem()
+	}
 	rows, err := q.Rows()
 	if err != nil {
 		return err
 	}
 	defer rows.Close()
+	elemvptrs := make([]reflect.Value, len(dests))
+	args := make([]interface{}, len(dests))
 	for rows.Next() {
-		elemvptr := reflect.New(elemt)
-		if err := rows.Scan(elemvptr.Interface()); err != nil {
+		for i := range args {
+			elemvptrs[i] = reflect.New(elemtypes[i])
+			args[i] = elemvptrs[i].Interface()
+		}
+		if err := rows.Scan(args...); err != nil {
 			return err
 		}
-		slicev.Set(reflect.Append(slicev, reflect.Indirect(elemvptr)))
+		for i := range args {
+			slicevals[i].Set(reflect.Append(slicevals[i], reflect.Indirect(elemvptrs[i])))
+		}
 	}
 	return rows.Err()
 }

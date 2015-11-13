@@ -41,6 +41,23 @@ func TestScanRow(t *testing.T) {
 	}
 }
 
+func TestScanRows(t *testing.T) {
+	var (
+		ids   []int64
+		names []string
+	)
+	dvr.SetColumns("ID", "Name").SetResult(U{1, "David"}, U{3, "Gareth"})
+	db.Query("").ScanRows(&ids, &names)
+	expIDs := []int64{1, 3}
+	expNames := []string{"David", "Gareth"}
+	if !reflect.DeepEqual(ids, expIDs) {
+		t.Errorf("ids: got %v, want %v", ids, expIDs)
+	}
+	if !reflect.DeepEqual(names, expNames) {
+		t.Errorf("names: got %v, want %v", names, expNames)
+	}
+}
+
 func Test_One_and_All(t *testing.T) {
 	tests := []struct {
 		cols     []string
@@ -49,10 +66,6 @@ func Test_One_and_All(t *testing.T) {
 		method   func(q *Query, dest interface{}) error
 		expected interface{}
 	}{
-		{cols("ID"), result(U{1, "John"}, U{3, "Peter"}, U{10, "Carmen"}),
-			newTypeOf([]int64{}), (*Query).All,
-			[]int64{1, 3, 10},
-		},
 		{cols("ID", "Name"), result(U{2, "Caroline"}, U{3, "Mark"}, U{4, "Lucas"}),
 			newTypeOf([]U{}), (*Query).All,
 			[]U{{2, "Caroline"}, {3, "Mark"}, {4, "Lucas"}},
