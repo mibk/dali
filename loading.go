@@ -114,10 +114,11 @@ func (q *Query) load(v reflect.Value, elemt reflect.Type, loadJustOne, isPtr boo
 			return err
 		}
 		if loadJustOne {
-			// v must is a struct.
+			// v is a struct.
 			v.Set(elemv)
 			err = nil
 			break
+
 			// Otherwise, v must be a slice.
 		} else if isPtr {
 			v.Set(reflect.Append(v, elemvptr))
