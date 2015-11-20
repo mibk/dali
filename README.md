@@ -19,7 +19,7 @@ consider removing some of the already implemented features (if it turns out they
 
 Help would be much appreciated, especially in finding bugs, improving the doc (the grammar
 in particular as I'm not a native speaker), cleaning up the API (focusing on func's/method's
-names), etc.
+names), increasing performance (no optimizations were done so far), etc.
 
 ## Quickstart
 
@@ -61,6 +61,13 @@ func main() {
 		panic(err)
 	}
 	fmt.Println(u)
+
+	u.Email = "peter@foo.net"
+	u.GroupID = 2
+	db.Query(`UPDATE [user] ?set WHERE [id] = ?`,
+		dali.OnlyCols(u, "email", "group_id"), 1).MustExec()
+	// UPDATE `user` SET `email` = 'peter@foo.net', `group_id` = 2
+	//	WHERE `id` = 1
 }
 
 type User struct {
@@ -129,8 +136,49 @@ some additional placeholders. The complete list is:
 ?raw       inserts the parameter as is (meant for SQL parts)
 ```
 
-Only `?`, `?ident`, `?ident...`, and `?raw` are allowed in prepared statements (see Prepare method's
+Using the placeholders it is easy and quite expressive to write common SQL queries, but it is
+also possible to adjust these queries to a specific need (which is often not so easy when using
+query builders).
+
+*Note*: only `?`, `?ident`, `?ident...`, and `?raw` are allowed in prepared statements (see Prepare method's
 doc for more information).
+
+### Profiling and other
+
+Using the [DB.SetMiddlewareFunc](https://godoc.org/github.com/mibk/dali#DB.SetMiddlewareFunc) it is
+possible to do additional operations before and after execution of every query. This example
+logs every executed query:
+
+```go
+var db *dali.DB // init db...
+
+func init() {
+	db.SetMiddlewareFunc(profile)
+}
+
+func profile(e dali.Execer) dali.Execer {
+	return profiler{e}
+}
+
+type profiler struct {
+	ex dali.Execer
+}
+
+func (p profiler) Exec(query string, args ...interface{}) (sql.Result, error) {
+	log.Println(query, args)
+	return p.ex.Exec(query, args...)
+}
+
+func (p profiler) Query(query string, args ...interface{}) (*sql.Rows, error) {
+	log.Println(query, args)
+	return p.ex.Query(query, args...)
+}
+
+func (p profiler) QueryRow(query string, args ...interface{}) *sql.Row {
+	log.Println(query, args)
+	return p.ex.QueryRow(query, args...)
+}
+```
 
 ### Faster performance
 
