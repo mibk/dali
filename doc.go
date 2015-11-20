@@ -24,4 +24,23 @@
 //   ?ident     used for identifiers (column or table name)
 //   ?ident...  expands identifiers and separates them with a comma
 //   ?raw       inserts the parameter as is (meant for SQL parts)
+//
+// Prepared statements
+//
+// dali has also a support for prepared statements. However, it doesn't support certain
+// placeholders. Only ?ident, ?ident..., and ?raw placeholders are allowed in the phase
+// of the query building (befored the statement is prepared). The ? placeholder is the
+// only one left for parameter binding. So working with prepared statements can look
+// like this:
+//
+// 	cols := []strings{"name", "group_id"}
+// 	var (
+// 		name    string
+// 		groupID int64
+// 	)
+// 	stmt := db.Prepare(`SELECT ?ident... FROM [user] WHERE [id] = ?`, cols)
+//	// This prepares this statement:
+//	//	SELECT `name`, `group_id` FROM `user` WHERE `id` = ?
+// 	stmt.Bind(14).ScanRow(&name, &groupID)
+//	// Bind the statement with 14 value and scan the row into these variables.
 package dali

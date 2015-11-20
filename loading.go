@@ -6,11 +6,11 @@ import (
 	"reflect"
 )
 
-// One executes a query that returns rows and loads the resulting
-// data from the first row into dest which must be a struct.
-// Only fields that match the column names (after filtering
-// through the mapperFunc) are filled. One returns sql.ErrNoRows
-// if there are no rows.
+// One executes the query that should return rows and loads the
+// resulting data from the first row into dest which must be a struct.
+// Only fields that match the column names (after filtering through
+// the mapperFunc) are filled. One returns sql.ErrNoRows if there are
+// no rows.
 func (q *Query) One(dest interface{}) error {
 	destv := reflect.ValueOf(dest)
 	if destv.Kind() != reflect.Ptr {

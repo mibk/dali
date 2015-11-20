@@ -39,6 +39,8 @@ func (p *Preprocessor) Process(sql string, args []interface{}) (string, error) {
 	return pp.process(sql)
 }
 
+// ProcessPreparedStmt processes the sql and the args for prepared statements.
+// It returns the resulting SQL query and an error if there is one.
 func (p *Preprocessor) ProcessPreparedStmt(sql string, args []interface{}) (string, error) {
 	pp := &preprocessor{Preprocessor: p, args: args, isPreparedStmt: true}
 	return pp.process(sql)

@@ -15,7 +15,7 @@ type Query struct {
 	err     error
 }
 
-// Exec executes a query that doesn't return rows.
+// Exec executes the query that shouldn't return rows.
 // For example: INSERT or UPDATE.
 func (q *Query) Exec() (sql.Result, error) {
 	if q.err != nil {
@@ -33,7 +33,7 @@ func (q *Query) MustExec() sql.Result {
 	return res
 }
 
-// Rows executes a query that returns rows, typically a SELECT.
+// Rows executes that query that should return rows, typically a SELECT.
 func (q *Query) Rows() (*sql.Rows, error) {
 	if q.err != nil {
 		return nil, q.err
@@ -41,7 +41,7 @@ func (q *Query) Rows() (*sql.Rows, error) {
 	return q.execer.Query(q.query, q.args...)
 }
 
-// ScanRow executes a query that is expected to return at most one row.
+// ScanRow executes the query that is expected to return at most one row.
 // It copies the columns from the matched row into the values
 // pointed at by dest. If more than one row matches the query,
 // ScanRow uses the first row and discards the rest. If no row matches
