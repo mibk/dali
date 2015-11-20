@@ -1,5 +1,8 @@
-![DALí Logo](_doc/img/dali.png)
-# Database Abstraction Layer (í) [![GoDoc](https://godoc.org/github.com/mibk/dali?status.png)](https://godoc.org/github.com/mibk/dali)
+![DALí Logo](_doc/img/dali.png) &nbsp;
+[![GoDoc](https://godoc.org/github.com/mibk/dali?status.png)](https://godoc.org/github.com/mibk/dali)
+[![Build Status](https://travis-ci.org/mibk/dali.png)](https://travis-ci.org/mibk/dali)
+
+# Database Abstraction Layer (í)
 
 DALí is not exactly a database abstration layer. It doesn't try to abstract the SQL in a way
 that the queries could run unchanged on any supported database. It rather abstracts
