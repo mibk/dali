@@ -159,3 +159,16 @@ type Execer interface {
 	Query(query string, args ...interface{}) (*sql.Rows, error)
 	QueryRow(query string, args ...interface{}) *sql.Row
 }
+
+// LastInsertID is a helper that wraps a call to a function returning
+// (sql.Result, error). It returns err if it is not nil, otherwise it
+// returns res.LastInsertId(). It is intended for use such as
+//
+// q := db.Query(...)
+// id, err := dali.LastInsertID(q.Exec())
+func LastInsertID(res sql.Result, err error) (int64, error) {
+	if err != nil {
+		return 0, err
+	}
+	return res.LastInsertId()
+}
