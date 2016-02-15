@@ -23,12 +23,12 @@
 //              INSERT clause
 //   ?ident     used for identifiers (column or table name)
 //   ?ident...  expands identifiers and separates them with a comma
-//   ?raw       inserts the parameter as is (meant for SQL parts)
+//   ?sql       inserts the parameter as is (meant for SQL parts)
 //
 // Prepared statements
 //
 // dali has also a support for prepared statements. However, it doesn't support certain
-// placeholders. Only ?ident, ?ident..., and ?raw placeholders are allowed in the phase
+// placeholders. Only ?ident, ?ident..., and ?sql placeholders are allowed in the phase
 // of the query building (befored the statement is prepared). The ? placeholder is the
 // only one left for parameter binding. So working with prepared statements can look
 // like this:

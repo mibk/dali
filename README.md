@@ -133,14 +133,14 @@ some additional placeholders. The complete list is:
            INSERT clause
 ?ident     used for identifiers (column or table name)
 ?ident...  expands identifiers and separates them with a comma
-?raw       inserts the parameter as is (meant for SQL parts)
+?sql       inserts the parameter as is (meant for SQL parts)
 ```
 
 Using the placeholders it is easy and quite expressive to write common SQL queries, but it is
 also possible to adjust these queries to a specific need (which is often not so easy when using
 query builders).
 
-*Note*: only `?`, `?ident`, `?ident...`, and `?raw` are allowed in prepared statements (see Prepare method's
+*Note*: only `?`, `?ident`, `?ident...`, and `?sql` are allowed in prepared statements (see Prepare method's
 doc for more information).
 
 ### Profiling and other

@@ -91,7 +91,7 @@ func (db *DB) Query(query string, args ...interface{}) *Query {
 // The caller must call the statement's Close method when the statement
 // is no longer needed. Unlike the Prepare methods in database/sql this
 // method also accepts args, which are meant only for query building.
-// Therefore, only ?ident, ?ident..., ?raw are interpolated in this phase.
+// Therefore, only ?ident, ?ident..., ?sql are interpolated in this phase.
 // Apart of that, ? is the only other placeholder allowed (this one
 // will be transformed into a dialect specific one to allow the parameter
 // binding.

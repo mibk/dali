@@ -22,7 +22,7 @@ var placeholderTests = []struct {
 	{"SELECT ?ident...", Args{[]string{"col1", "col2", "another"}},
 		"SELECT {col1}, {col2}, {another}"},
 
-	{"SELECT ?raw", Args{"* FROM user"}, "SELECT * FROM user"},
+	{"SELECT ?sql", Args{"* FROM user"}, "SELECT * FROM user"},
 
 	{"INSERT INTO [user] ?values", Args{User{1, "Salvador", 0}},
 		"INSERT INTO {user} ({id}, {user_name}) VALUES (1, 'Salvador')"},
@@ -176,7 +176,7 @@ var errorTests = []struct {
 	{"INSERT INTO ?ident", Args{}, "dali: there is not enough args for placeholders"},
 	{"SELECT ?, ?", Args{3, 4, 5}, "dali: only 2 args are expected"},
 	{"INSERT INTO ?ident", Args{5}, "dali: ?ident expects the argument to be a string"},
-	{"INSERT INTO ?raw", Args{5}, "dali: ?raw expects the argument to be a string"},
+	{"INSERT INTO ?sql", Args{5}, "dali: ?sql expects the argument to be a string"},
 	{"INSERT INTO ?u", Args{5}, "dali: unknown placeholder ?u"},
 	{"INSERT ?u...", Args{nil}, "dali: ?u cannot be expanded (...) or doesn't exist"},
 	{"INSERT INTO ?", Args{func() {}}, "dali: invalid argument type: func()"},
