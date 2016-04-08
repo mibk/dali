@@ -23,7 +23,7 @@ func (n *NullTime) Scan(value interface{}) error {
 		n.Time, n.Valid = t, true
 		return nil
 	}
-	return fmt.Errorf("cannoct convert %T to dali.NullTime", value)
+	return fmt.Errorf("dali: cannot convert %T to dali.NullTime", value)
 }
 
 // Value implements the driver.Value interface.
