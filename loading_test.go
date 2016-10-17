@@ -21,7 +21,6 @@ func init() {
 		panic(err)
 	}
 	db = NewDB(dbHandle, dvr)
-	db.SetMapperFunc(func(s string) string { return s })
 }
 
 func TestScanRow(t *testing.T) {

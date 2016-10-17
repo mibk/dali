@@ -49,41 +49,41 @@ var placeholderTests = []struct {
 
 	// embedded structs
 	{"INSERT ?values", Args{E{1, Name{"John", "Doe"}}},
-		"INSERT ({id}, {first}, {last}) VALUES (1, 'John', 'Doe')"},
+		"INSERT ({ID}, {First}, {Last}) VALUES (1, 'John', 'Doe')"},
 
 	// ignored embedded structs
 	{"?values", Args{SpecialStruct{"Waking up", parseTime("2015-04-05 06:07:08"), NullTime{}}},
-		"({event}, {started}, {finished}) VALUES ('Waking up', " +
+		"({Event}, {Started}, {Finished}) VALUES ('Waking up', " +
 			"'2015-04-05 06:07:08 +0000 UTC', NULL)"},
 	{"?values", Args{SpecialStruct{"Waking up", parseTime("2015-04-05 06:07:08"),
 		NullTime{parseTime("2015-04-05 06:38:15"), true}}},
-		"({event}, {started}, {finished}) VALUES ('Waking up', " +
+		"({Event}, {Started}, {Finished}) VALUES ('Waking up', " +
 			"'2015-04-05 06:07:08 +0000 UTC', '2015-04-05 06:38:15 +0000 UTC')"},
 
 	// ignore valuer but not scanner
-	{"?values", Args{VS{Val{2, 3}, Scan{"A", "B"}}}, "({val}, {a}, {b}) VALUES (5, 'A', 'B')"},
+	{"?values", Args{VS{Val{2, 3}, Scan{"A", "B"}}}, "({Val}, {A}, {B}) VALUES (5, 'A', 'B')"},
 
 	// ,omitinsert
 	{"INSERT ?values", Args{Omit{Name: "John", Age: 21}},
-		"INSERT ({name}, {age}) VALUES ('John', 21)"},
+		"INSERT ({Name}, {Age}) VALUES ('John', 21)"},
 	{"INSERT ?values", Args{Omit2{Name: "Rudolf", Age: 28}},
-		"INSERT ({name}, {age}) VALUES ('Rudolf', 28)"},
+		"INSERT ({Name}, {Age}) VALUES ('Rudolf', 28)"},
 
 	// only specified columns
-	{"INSERT ?values", Args{OnlyCols(Omit{Name: "David"}, "name")},
-		"INSERT ({name}) VALUES ('David')"},
-	{"INSERT ?values", Args{OnlyCols(Omit{Name: "David", Age: 23}, "name", "age")},
-		"INSERT ({name}, {age}) VALUES ('David', 23)"},
-	{"UPDATE ?set", Args{OnlyCols(Omit{Name: "David"}, "name")},
-		"UPDATE SET {name} = 'David'"},
-	{"INSERT ?values...", Args{OnlyCols([]Omit{{Name: "David"}, {Name: "Rick"}}, "name")},
-		"INSERT ({name}) VALUES ('David'), ('Rick')"},
+	{"INSERT ?values", Args{OnlyCols(Omit{Name: "David"}, "Name")},
+		"INSERT ({Name}) VALUES ('David')"},
+	{"INSERT ?values", Args{OnlyCols(Omit{Name: "David", Age: 23}, "Name", "Age")},
+		"INSERT ({Name}, {Age}) VALUES ('David', 23)"},
+	{"UPDATE ?set", Args{OnlyCols(Omit{Name: "David"}, "Name")},
+		"UPDATE SET {Name} = 'David'"},
+	{"INSERT ?values...", Args{OnlyCols([]Omit{{Name: "David"}, {Name: "Rick"}}, "Name")},
+		"INSERT ({Name}) VALUES ('David'), ('Rick')"},
 	{"INSERT ?values", Args{OnlyCols(Map{"id": 3, "name": "Frank"}, "name")},
 		"INSERT ({name}) VALUES ('Frank')"},
 }
 
 func TestPlaceholders(t *testing.T) {
-	preproc := NewPreprocessor(FakeDialect{}, ToUnderscore)
+	preproc := NewPreprocessor(FakeDialect{})
 	for _, tt := range placeholderTests {
 		str, err := preproc.Process(tt.sql, tt.args)
 		if err != nil {
@@ -98,7 +98,7 @@ func TestPlaceholders(t *testing.T) {
 type Args []interface{}
 
 type User struct {
-	ID     int64
+	ID     int64  `db:"id"`
 	Name   string `db:"user_name"`
 	Ignore int    `db:"-"`
 }
@@ -209,7 +209,7 @@ var errorTests = []struct {
 }
 
 func TestErrors(t *testing.T) {
-	preproc := NewPreprocessor(FakeDialect{}, ToUnderscore)
+	preproc := NewPreprocessor(FakeDialect{})
 	for _, tt := range errorTests {
 		_, err := preproc.Process(tt.sql, tt.args)
 		if err == nil {
@@ -258,8 +258,7 @@ var typesTests = []struct {
 }
 
 func TestPreprocessingTypes(t *testing.T) {
-	preproc := NewPreprocessor(FakeDialect{}, ToUnderscore)
-	preproc.setMapperFunc(func(s string) string { return s })
+	preproc := NewPreprocessor(FakeDialect{})
 	for _, tt := range typesTests {
 		str, err := preproc.Process(tt.sql, tt.args)
 		if err != nil {
@@ -298,7 +297,7 @@ var preparedStmtTests = []struct {
 }
 
 func TestPreparedStmts(t *testing.T) {
-	preproc := NewPreprocessor(FakeDialect{}, ToUnderscore)
+	preproc := NewPreprocessor(FakeDialect{})
 	for _, tt := range preparedStmtTests {
 		str, err := preproc.ProcessPreparedStmt(tt.sql, tt.args)
 		var gotErr string
@@ -327,11 +326,7 @@ func (NopDialect) EscapeBytes(w io.Writer, b []byte)       {}
 func (NopDialect) EscapeTime(w io.Writer, t time.Time)     {}
 func (NopDialect) PrintPlaceholderSign(w io.Writer, n int) {}
 
-var preproc = NewPreprocessor(NopDialect{}, ToUnderscore)
-
-func init() {
-	preproc.setMapperFunc(func(s string) string { return s })
-}
+var preproc = NewPreprocessor(NopDialect{})
 
 func BenchmarkColumnEscaping(b *testing.B) {
 	for i := 0; i < b.N; i++ {

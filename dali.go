@@ -21,7 +21,7 @@ type DB struct {
 func NewDB(db *sql.DB, dialect dialects.Dialect) *DB {
 	return &DB{
 		DB:         db,
-		preproc:    NewPreprocessor(dialect, ToUnderscore),
+		preproc:    NewPreprocessor(dialect),
 		middleware: func(e Execer) Execer { return e },
 	}
 }
@@ -99,13 +99,6 @@ func (db *DB) Begin() (*Tx, error) {
 		db: db,
 		Tx: tx,
 	}, nil
-}
-
-// SetMapperFunc sets a mapper func which is used when deriving
-// column names from field names. If none is set, ToUnderscore
-// func is used.
-func (db *DB) SetMapperFunc(f func(string) string) {
-	db.preproc.setMapperFunc(f)
 }
 
 // SetMiddlewareFunc changes the DB middleware func. Default func

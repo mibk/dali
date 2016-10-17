@@ -19,17 +19,15 @@ import (
 // ErrNotUTF8 is returned when a string argument is not a valid UTF-8 string.
 var ErrNotUTF8 = errors.New("dali: argument is not a valid UTF-8 string")
 
-// Preprocessor processes SQL queries using a dialect.
+// A Preprocessor processes SQL queries using a dialect.
 type Preprocessor struct {
-	dialect    dialects.Dialect
-	mapperFunc func(string) string
+	dialect dialects.Dialect
 }
 
 // NewPreprocessor creates a new Preprocessor. Processing is done
-// in the given dialect and mapperFunc is used when transforming
-// structs' field names to column names.
-func NewPreprocessor(dialect dialects.Dialect, mapperFunc func(string) string) *Preprocessor {
-	return &Preprocessor{dialect, mapperFunc}
+// in the given dialect.
+func NewPreprocessor(dialect dialects.Dialect) *Preprocessor {
+	return &Preprocessor{dialect}
 }
 
 // Process processes the sql and the args. It returns the resulting SQL query and
@@ -468,7 +466,7 @@ func (p *Preprocessor) colNamesAndFieldIndexesOfEmbedded(typ reflect.Type, index
 			continue
 		}
 		if prop.Col == "" {
-			prop.Col = p.mapperFunc(f.Name)
+			prop.Col = f.Name
 		}
 		if desiredCols != nil {
 			j := sort.SearchStrings(desiredCols, prop.Col)
@@ -513,8 +511,4 @@ func valuesByFieldIndexes(v reflect.Value, indexes [][]int) (vals []interface{})
 		vals = append(vals, v.FieldByIndex(index).Interface())
 	}
 	return
-}
-
-func (p *Preprocessor) setMapperFunc(f func(string) string) {
-	p.mapperFunc = f
 }
