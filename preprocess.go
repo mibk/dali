@@ -436,15 +436,11 @@ func errNoCols(v interface{}) error {
 // them together with the indexes of used fields. typ must be a struct type.
 // If the tag name equals "-", the field is ignored. If insert is true,
 // fields having the omitinsert property are ignored as well.
-func (p *Preprocessor) colNamesAndFieldIndexes(typ reflect.Type, insert bool, desiredCols []string) (
-	cols []string, indexes [][]int) {
-
+func (p *Preprocessor) colNamesAndFieldIndexes(typ reflect.Type, insert bool, desiredCols []string) (cols []string, indexes [][]int) {
 	return p.colNamesAndFieldIndexesOfEmbedded(typ, []int{}, insert, desiredCols)
 }
 
-func (p *Preprocessor) colNamesAndFieldIndexesOfEmbedded(typ reflect.Type, index []int, insert bool,
-	desiredCols []string) (cols []string, indexes [][]int) {
-
+func (p *Preprocessor) colNamesAndFieldIndexesOfEmbedded(typ reflect.Type, index []int, insert bool, desiredCols []string) (cols []string, indexes [][]int) {
 	for i := 0; i < typ.NumField(); i++ {
 		f := typ.Field(i)
 		if f.PkgPath != "" { // Is unexported?
