@@ -127,10 +127,10 @@ func (q *Query) load(v reflect.Value, elemt reflect.Type, loadJustOne, isPtr boo
 
 var ignoreField interface{}
 
-// ScanRows executes the query that is expected to return rows.
+// ScanWholeCols executes the query that is expected to return rows.
 // It copies the columns from the matched rows into the slices
 // pointed at by dests.
-func (q *Query) ScanRows(dests ...interface{}) error {
+func (q *Query) ScanWholeCols(dests ...interface{}) error {
 	slicevals := make([]reflect.Value, len(dests))
 	elemtypes := make([]reflect.Type, len(dests))
 	for i, dests := range dests {
