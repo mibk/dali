@@ -44,6 +44,8 @@ var placeholderTests = []struct {
 		"INSERT ({id}, {user_name}) VALUES (1, 'Martin')"},
 	{"INSERT ?values", Args{V{1, "Syd"}},
 		"INSERT ({V_name}) VALUES ('Syd')"},
+	{"INSERT ?values", Args{Map{"rank": "Colonel", "id": 3, "name": "Frank"}},
+		"INSERT ({id}, {name}, {rank}) VALUES (3, 'Frank', 'Colonel')"},
 
 	// embedded structs
 	{"INSERT ?values", Args{E{1, Name{"John", "Doe"}}},

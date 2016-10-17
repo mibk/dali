@@ -329,21 +329,20 @@ func (p *Preprocessor) deriveColsAndVals(v interface{}) (cols []string, vals []i
 	}
 	switch v := v.(type) {
 	case Map:
-		if desiredCols != nil {
-			for _, col := range desiredCols {
-				v, ok := v[col]
-				if !ok {
-					return nil, nil, fmt.Errorf(
-						"dali: only cols: %s not present in the Map", col)
-				}
-				cols = append(cols, col)
-				vals = append(vals, v)
+		if desiredCols == nil {
+			desiredCols = make([]string, 0, len(v))
+			for k := range v {
+				desiredCols = append(desiredCols, k)
 			}
-		} else {
-			for k, v := range v {
-				cols = append(cols, k)
-				vals = append(vals, v)
+			sort.Strings(desiredCols)
+		}
+		for _, col := range desiredCols {
+			v, ok := v[col]
+			if !ok {
+				return nil, nil, fmt.Errorf("dali: only cols: %s not present in the Map", col)
 			}
+			cols = append(cols, col)
+			vals = append(vals, v)
 		}
 	default:
 		vv := reflect.ValueOf(v)
