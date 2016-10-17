@@ -24,25 +24,25 @@ func TestMiddleware(t *testing.T) {
 	db.Query("#1").ScanRow()
 	checkmw("#1-queryrow")
 
-	db.MustPrepare("#2").Bind().Exec()
+	db.mustPrepare("#2").Bind().Exec()
 	checkmw("#2-exec")
-	db.MustPrepare("#2").Bind().Rows()
+	db.mustPrepare("#2").Bind().Rows()
 	checkmw("#2-query")
-	db.MustPrepare("#2").Bind().ScanRow()
+	db.mustPrepare("#2").Bind().ScanRow()
 	checkmw("#2-queryrow")
 
-	db.MustBegin().Query("#3").Exec()
+	db.mustBegin().Query("#3").Exec()
 	checkmw("#3-exec")
-	db.MustBegin().Query("#3").Rows()
+	db.mustBegin().Query("#3").Rows()
 	checkmw("#3-query")
-	db.MustBegin().Query("#3").ScanRow()
+	db.mustBegin().Query("#3").ScanRow()
 	checkmw("#3-queryrow")
 
-	db.MustBegin().MustPrepare("#4").Bind().Exec()
+	db.mustBegin().mustPrepare("#4").Bind().Exec()
 	checkmw("#4-exec")
-	db.MustBegin().MustPrepare("#4").Bind().Rows()
+	db.mustBegin().mustPrepare("#4").Bind().Rows()
 	checkmw("#4-query")
-	db.MustBegin().MustPrepare("#4").Bind().ScanRow()
+	db.mustBegin().mustPrepare("#4").Bind().ScanRow()
 	checkmw("#4-queryrow")
 }
 
@@ -64,4 +64,28 @@ func (p *middle) Query(query string, args ...interface{}) (*sql.Rows, error) {
 func (p *middle) QueryRow(query string, args ...interface{}) *sql.Row {
 	p.lastq = query + "-queryrow"
 	return p.ex.QueryRow(query, args...)
+}
+
+func (db *DB) mustPrepare(query string, args ...interface{}) *Stmt {
+	s, err := db.Prepare(query, args...)
+	if err != nil {
+		panic(err)
+	}
+	return s
+}
+
+func (db *DB) mustBegin() *Tx {
+	tx, err := db.Begin()
+	if err != nil {
+		panic(err)
+	}
+	return tx
+}
+
+func (tx *Tx) mustPrepare(query string, args ...interface{}) *Stmt {
+	s, err := tx.Prepare(query, args...)
+	if err != nil {
+		panic(err)
+	}
+	return s
 }

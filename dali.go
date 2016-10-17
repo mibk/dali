@@ -44,25 +44,6 @@ func Open(driverName, dataSourceName string) (*DB, error) {
 	return NewDB(db, dialect), nil
 }
 
-// MustOpen is like Open but panics on error.
-func MustOpen(driverName, dataSourceName string) *DB {
-	db, err := Open(driverName, dataSourceName)
-	if err != nil {
-		panic(err)
-	}
-	return db
-}
-
-// MustOpenAndVerify is like MustOpen but it verifies the connection and
-// panics on error.
-func MustOpenAndVerify(driverName, dataSourceName string) *DB {
-	db := MustOpen(driverName, dataSourceName)
-	if err := db.Ping(); err != nil {
-		panic(err)
-	}
-	return db
-}
-
 // Close closes the database, releasing any open resources.
 func (db *DB) Close() error {
 	return db.DB.Close()
@@ -107,15 +88,6 @@ func (db *DB) Prepare(query string, args ...interface{}) (*Stmt, error) {
 	return &Stmt{stmt, db, sql}, nil
 }
 
-// MustPrepare is like Prepare but panics on error.
-func (db *DB) MustPrepare(query string, args ...interface{}) *Stmt {
-	s, err := db.Prepare(query, args...)
-	if err != nil {
-		panic(err)
-	}
-	return s
-}
-
 // Begin starts a transaction. The isolation level is dependent on
 // the driver.
 func (db *DB) Begin() (*Tx, error) {
@@ -127,15 +99,6 @@ func (db *DB) Begin() (*Tx, error) {
 		db: db,
 		Tx: tx,
 	}, nil
-}
-
-// MustBegin is like Begin but panics on error.
-func (db *DB) MustBegin() *Tx {
-	tx, err := db.Begin()
-	if err != nil {
-		panic(err)
-	}
-	return tx
 }
 
 // SetMapperFunc sets a mapper func which is used when deriving

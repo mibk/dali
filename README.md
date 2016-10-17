@@ -34,11 +34,17 @@ import (
 	"github.com/mibk/dali"
 )
 
-var db = dali.MustOpenAndVerify("mysql", "root@/example?parseTime=true")
-
 func main() {
-	res := db.Query(`INSERT INTO [group] ?values`, dali.Map{"name": "admins"}).
-		MustExec()
+	db, err := dali.Open("mysql", "root@/example?parseTime=true")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	res, err := db.Query(`INSERT INTO [group] ?values`, dali.Map{"name": "admins"}).
+		Exec()
+	if err != nil {
+		log.Fatal(err)
+	}
 	// INSERT INTO `group` (`name`) VALUES ('admins')
 
 	groupID, _ := res.LastInsertId()
@@ -46,7 +52,10 @@ func main() {
 		{0, "Peter", "peter@foo.com", groupID, time.Now()},
 		{0, "Nick", "nick@bar.org", groupID, time.Now()},
 	}
-	db.Query(`INSERT INTO [user] ?values...`, users).MustExec()
+	_, err = db.Query(`INSERT INTO [user] ?values...`, users).Exec()
+	if err != nil {
+		log.Fatal(err)
+	}
 	// ?values... expands a slice of struct into multi insert
 	// INSERT INTO `user` (`name`, `email`, `group_id`, `created`) VALUES
 	//	('Peter', 'peter@foo.com', 1, '2015-11-20 13:59:59'),
@@ -64,8 +73,11 @@ func main() {
 
 	u.Email = "peter@foo.net"
 	u.GroupID = 2
-	db.Query(`UPDATE [user] ?set WHERE [id] = ?`,
-		dali.OnlyCols(u, "email", "group_id"), 1).MustExec()
+	_, err = db.Query(`UPDATE [user] ?set WHERE [id] = ?`,
+		dali.OnlyCols(u, "email", "group_id"), 1).Exec()
+	if err != nil {
+		log.Fatal(err)
+	}
 	// UPDATE `user` SET `email` = 'peter@foo.net', `group_id` = 2
 	//	WHERE `id` = 1
 }

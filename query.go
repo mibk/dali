@@ -24,15 +24,6 @@ func (q *Query) Exec() (sql.Result, error) {
 	return q.execer.Exec(q.query, q.args...)
 }
 
-// MustExec is like Exec but panics on error.
-func (q *Query) MustExec() sql.Result {
-	res, err := q.Exec()
-	if err != nil {
-		panic(err)
-	}
-	return res
-}
-
 // Rows executes that query that should return rows, typically a SELECT.
 func (q *Query) Rows() (*sql.Rows, error) {
 	if q.err != nil {

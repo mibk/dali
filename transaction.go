@@ -41,15 +41,6 @@ func (tx *Tx) Prepare(query string, args ...interface{}) (*Stmt, error) {
 	return &Stmt{stmt, tx.db, sql}, nil
 }
 
-// MustPrepare is like Prepare but panics on error.
-func (tx *Tx) MustPrepare(query string, args ...interface{}) *Stmt {
-	s, err := tx.Prepare(query, args...)
-	if err != nil {
-		panic(err)
-	}
-	return s
-}
-
 // Commit commits the transaction.
 func (tx *Tx) Commit() error { return tx.Tx.Commit() }
 
