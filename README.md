@@ -1,4 +1,4 @@
-![DALí Logo](_doc/img/dali.png) &nbsp;
+![DALí Logo](dali.png) &nbsp;
 [![GoDoc](https://godoc.org/github.com/mibk/dali?status.png)](https://godoc.org/github.com/mibk/dali)
 [![Build Status](https://travis-ci.org/mibk/dali.png)](https://travis-ci.org/mibk/dali)
 
