@@ -11,16 +11,6 @@ just the placeholder manipulation and provides convenient ways for some common s
 The main goal of this project is to provide a clean, compact API for communication with
 SQL databases.
 
-## Status
-
-At the moment, project is settling down, hoping, the v1.0 could be released in a month or so.
-I would like to decide whether there are features that are worth adding before v1.0, and
-consider removing some of the already implemented features (if it turns out they are needless).
-
-Help would be much appreciated, especially in finding bugs, improving the doc (the grammar
-in particular as I'm not a native speaker), cleaning up the API (focusing on func's/method's
-names), increasing performance (no optimizations were done so far), etc.
-
 ## Quickstart
 
 ```go
@@ -28,6 +18,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -40,14 +31,13 @@ func main() {
 		log.Fatal(err)
 	}
 
-	res, err := db.Query(`INSERT INTO [group] ?values`, dali.Map{"name": "admins"}).
-		Exec()
+	q := db.Query(`INSERT INTO [group] ?values`, dali.Map{"name": "admins"})
+	groupID, err := dali.LastInsertID(q.Exec())
 	if err != nil {
 		log.Fatal(err)
 	}
 	// INSERT INTO `group` (`name`) VALUES ('admins')
 
-	groupID, _ := res.LastInsertId()
 	users := []User{
 		{0, "Peter", "peter@foo.com", groupID, time.Now()},
 		{0, "Nick", "nick@bar.org", groupID, time.Now()},
@@ -62,12 +52,12 @@ func main() {
 	//	('Nick', 'nick@bar.org', 1, '2015-11-20 13:59:59')
 
 	var u User
-	q := db.Query(`SELECT * FROM ?ident WHERE group_id IN (?...) LIMIT 1`,
-		"user", []int64{1, 2, 5})
+	q = db.Query(`SELECT * FROM ?ident WHERE group_id IN (?...) LIMIT 1`,
+		"user", []int{1, 2, 5})
 	fmt.Println(q) // dali.Query implements fmt.Stringer. It prints:
 	// SELECT * FROM `user` WHERE group_id IN (1, 2, 5) LIMIT 1
 	if err := q.One(&u); err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 	fmt.Println(u)
 
