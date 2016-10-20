@@ -18,7 +18,3 @@ type Dialect interface {
 func writeByte(w io.Writer, b byte) (n int, err error) {
 	return w.Write([]byte{b})
 }
-
-func writeString(w io.Writer, s string) (n int, err error) {
-	return w.Write([]byte(s))
-}
