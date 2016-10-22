@@ -10,7 +10,7 @@ import (
 //	u.GroupID = 5
 //	_, err := db.Query("UPDATE user ?set", dali.OnlyCols(u, "group_id")).
 //		Exec()
-func OnlyCols(v interface{}, cols ...string) onlyCols {
+func OnlyCols(v interface{}, cols ...string) interface{} {
 	if len(cols) == 0 {
 		return onlyCols{err: errors.New("dali: no columns passed to OnlyCols")}
 	}
