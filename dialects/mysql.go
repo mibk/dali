@@ -6,16 +6,21 @@ import (
 	"time"
 )
 
-type MySQL struct{}
+// MySQL returns the MySQL dialect.
+func MySQL() Dialect {
+	return mySQL{}
+}
 
-func (MySQL) EscapeIdent(w io.Writer, ident string) {
+type mySQL struct{}
+
+func (mySQL) EscapeIdent(w io.Writer, ident string) {
 	writeByte(w, '`')
 	r := strings.NewReplacer("`", "``")
 	io.WriteString(w, r.Replace(ident))
 	writeByte(w, '`')
 }
 
-func (MySQL) EscapeBool(w io.Writer, v bool) {
+func (mySQL) EscapeBool(w io.Writer, v bool) {
 	if v {
 		writeByte(w, '1')
 	} else {
@@ -23,11 +28,11 @@ func (MySQL) EscapeBool(w io.Writer, v bool) {
 	}
 }
 
-func (MySQL) EscapeString(w io.Writer, s string) {
+func (mySQL) EscapeString(w io.Writer, s string) {
 	escapeBytes(w, []byte(s))
 }
 
-func (MySQL) EscapeBytes(w io.Writer, b []byte) {
+func (mySQL) EscapeBytes(w io.Writer, b []byte) {
 	io.WriteString(w, "_binary")
 	escapeBytes(w, b)
 }
@@ -65,12 +70,12 @@ func escapeBytes(w io.Writer, bytes []byte) {
 
 const mysqlTimeFormat = "2006-01-02 15:04:05"
 
-func (MySQL) EscapeTime(w io.Writer, t time.Time) {
+func (mySQL) EscapeTime(w io.Writer, t time.Time) {
 	writeByte(w, '\'')
 	io.WriteString(w, t.Format(mysqlTimeFormat))
 	writeByte(w, '\'')
 }
 
-func (MySQL) PrintPlaceholderSign(w io.Writer, n int) {
+func (mySQL) PrintPlaceholderSign(w io.Writer, n int) {
 	writeByte(w, '?')
 }

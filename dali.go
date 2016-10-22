@@ -33,7 +33,7 @@ func Open(driverName, dataSourceName string) (*DB, error) {
 	var dialect dialects.Dialect
 	switch driverName {
 	case "mysql":
-		dialect = dialects.MySQL{}
+		dialect = dialects.MySQL()
 	default:
 		panic("dali: unsupported dialect")
 	}

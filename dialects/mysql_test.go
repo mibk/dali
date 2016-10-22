@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-var d = MySQL{}
+var d = MySQL()
 
 func TestEscapeIdent(t *testing.T) {
 	tests := []struct {
