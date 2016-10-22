@@ -198,7 +198,7 @@ var errorTests = []struct {
 	// empty columns
 	{"INSERT ?values", Args{Map{}}, "dali: no columns derived from dali.Map"},
 	{"INSERT ?values", Args{struct{}{}}, "dali: no columns derived from struct {}"},
-	{"INSERT ?values...", Args{[]struct{}{struct{}{}}}, "dali: no columns derived from []struct {}"},
+	{"INSERT ?values...", Args{[]struct{}{{}}}, "dali: no columns derived from []struct {}"},
 	{"INSERT ?values", Args{OmitEverything{}}, "dali: no columns derived from dali.OmitEverything"},
 	{"INSERT ?set", Args{struct{}{}}, "dali: no columns derived from struct {}"},
 
