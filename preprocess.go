@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"database/sql"
 	"database/sql/driver"
-	"errors"
 	"fmt"
 	"reflect"
 	"sort"
@@ -15,9 +14,6 @@ import (
 
 	"github.com/mibk/dali/dialects"
 )
-
-// ErrNotUTF8 is returned when a string argument is not a valid UTF-8 string.
-var ErrNotUTF8 = errors.New("dali: argument is not a valid UTF-8 string")
 
 // A Preprocessor processes SQL queries using a dialect.
 type Preprocessor struct {
@@ -234,9 +230,6 @@ func (p *Preprocessor) escapeValue(b *bytes.Buffer, v interface{}) error {
 		formatFloat(b, v)
 
 	case string:
-		if !utf8.ValidString(v) {
-			return ErrNotUTF8
-		}
 		p.dialect.EscapeString(b, v)
 
 	case []byte:
