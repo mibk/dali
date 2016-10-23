@@ -321,26 +321,16 @@ func (p *Preprocessor) printSetClause(b *bytes.Buffer, v interface{}) error {
 // deriveColsAndVals derives column names from an underlying type of v and returns
 // them together with the corresponding values.
 func (p *Preprocessor) deriveColsAndVals(v interface{}) (cols []string, vals []interface{}, err error) {
-	desiredCols, v, err := getDesiredCols(v)
-	if err != nil {
-		return nil, nil, err
-	}
 	switch v := v.(type) {
 	case Map:
-		if desiredCols == nil {
-			desiredCols = make([]string, 0, len(v))
-			for k := range v {
-				desiredCols = append(desiredCols, k)
-			}
-			sort.Strings(desiredCols)
+		keys := make([]string, 0, len(v))
+		for k := range v {
+			keys = append(keys, k)
 		}
-		for _, col := range desiredCols {
-			v, ok := v[col]
-			if !ok {
-				return nil, nil, fmt.Errorf("dali: only cols: %s not present in the Map", col)
-			}
+		sort.Strings(keys)
+		for _, col := range keys {
 			cols = append(cols, col)
-			vals = append(vals, v)
+			vals = append(vals, v[col])
 		}
 	default:
 		vv := reflect.ValueOf(v)
@@ -351,7 +341,7 @@ func (p *Preprocessor) deriveColsAndVals(v interface{}) (cols []string, vals []i
 			return nil, nil, fmt.Errorf("dali: argument must be a pointer to a struct")
 		}
 		var indexes [][]int
-		cols, indexes = p.colNamesAndFieldIndexes(vv.Type(), true, desiredCols)
+		cols, indexes = p.colNamesAndFieldIndexes(vv.Type(), true)
 		vals = valuesByFieldIndexes(vv, indexes)
 	}
 	if len(cols) == 0 {
@@ -360,22 +350,7 @@ func (p *Preprocessor) deriveColsAndVals(v interface{}) (cols []string, vals []i
 	return
 }
 
-func getDesiredCols(v interface{}) ([]string, interface{}, error) {
-	if oc, ok := v.(onlyCols); ok {
-		if oc.err != nil {
-			return nil, nil, oc.err
-		}
-		return oc.cols, oc.v, nil
-	}
-	// All columns are desired.
-	return nil, v, nil
-}
-
 func (p *Preprocessor) printMultiValuesClause(b *bytes.Buffer, v interface{}) error {
-	desiredCols, v, err := getDesiredCols(v)
-	if err != nil {
-		return err
-	}
 	errInvalidArg := fmt.Errorf("dali: ?values... expects the argument to be a slice of structs")
 	vv := reflect.ValueOf(v)
 	if vv.Kind() != reflect.Slice {
@@ -393,7 +368,7 @@ func (p *Preprocessor) printMultiValuesClause(b *bytes.Buffer, v interface{}) er
 	if vv.Len() == 0 {
 		return fmt.Errorf("dali: empty slice passed to ?values...")
 	}
-	cols, indexes := p.colNamesAndFieldIndexes(el, true, desiredCols)
+	cols, indexes := p.colNamesAndFieldIndexes(el, true)
 	if len(cols) == 0 {
 		return errNoCols(v)
 	}
@@ -434,11 +409,11 @@ func errNoCols(v interface{}) error {
 // them together with the indexes of used fields. typ must be a struct type.
 // If the tag name equals "-", the field is ignored. If insert is true,
 // fields having the omitinsert property are ignored as well.
-func (p *Preprocessor) colNamesAndFieldIndexes(typ reflect.Type, insert bool, desiredCols []string) (cols []string, indexes [][]int) {
-	return p.colNamesAndFieldIndexesOfEmbedded(typ, []int{}, insert, desiredCols)
+func (p *Preprocessor) colNamesAndFieldIndexes(typ reflect.Type, insert bool) (cols []string, indexes [][]int) {
+	return p.colNamesAndFieldIndexesOfEmbedded(typ, []int{}, insert)
 }
 
-func (p *Preprocessor) colNamesAndFieldIndexesOfEmbedded(typ reflect.Type, index []int, insert bool, desiredCols []string) (cols []string, indexes [][]int) {
+func (p *Preprocessor) colNamesAndFieldIndexesOfEmbedded(typ reflect.Type, index []int, insert bool) (cols []string, indexes [][]int) {
 	for i := 0; i < typ.NumField(); i++ {
 		f := typ.Field(i)
 		if f.PkgPath != "" { // Is unexported?
@@ -455,7 +430,7 @@ func (p *Preprocessor) colNamesAndFieldIndexesOfEmbedded(typ reflect.Type, index
 				break
 			default:
 				emCols, emIndexes := p.colNamesAndFieldIndexesOfEmbedded(f.Type,
-					append(index, i), insert, desiredCols)
+					append(index, i), insert)
 				cols = append(cols, emCols...)
 				indexes = append(indexes, emIndexes...)
 				continue
@@ -467,12 +442,6 @@ func (p *Preprocessor) colNamesAndFieldIndexesOfEmbedded(typ reflect.Type, index
 		}
 		if prop.Col == "" {
 			prop.Col = f.Name
-		}
-		if desiredCols != nil {
-			j := sort.SearchStrings(desiredCols, prop.Col)
-			if j >= len(desiredCols) || desiredCols[j] != prop.Col {
-				continue
-			}
 		}
 		cols = append(cols, prop.Col)
 		indexes = append(indexes, append(index, i))

@@ -64,7 +64,10 @@ func main() {
 	u.Email = "peter@foo.net"
 	u.GroupID = 2
 	_, err = db.Query(`UPDATE [user] ?set WHERE [id] = ?`,
-		dali.OnlyCols(u, "email", "group_id"), 1).Exec()
+		dali.Map{
+			"email":    u.Email,
+			"group_id": u.GroupID,
+		}, 1).Exec()
 	if err != nil {
 		log.Fatal(err)
 	}
