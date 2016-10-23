@@ -9,6 +9,8 @@ type Stmt struct {
 	sql  string
 }
 
+// Bind binds args to the prepared statement and returns a Query struct
+// ready to be executed. See (*DB).Query method.
 func (s *Stmt) Bind(args ...interface{}) *Query {
 	return &Query{
 		execer:  s.db.middleware(stmtExecer{s.stmt}),
