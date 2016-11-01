@@ -4,8 +4,8 @@ import "database/sql"
 
 // Stmt is a prepared statement.
 type Stmt struct {
+	db   *DB // for middleware and preprocessing only
 	stmt *sql.Stmt
-	db   *DB
 	sql  string
 }
 

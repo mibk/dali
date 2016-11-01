@@ -85,7 +85,7 @@ func (db *DB) Prepare(query string, args ...interface{}) (*Stmt, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Stmt{stmt, db, sql}, nil
+	return &Stmt{db, stmt, sql}, nil
 }
 
 // Begin starts a transaction. The isolation level is dependent on

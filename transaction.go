@@ -6,7 +6,7 @@ import "database/sql"
 // of the sql.Tx's original methods for comunication with
 // the database.
 type Tx struct {
-	db *DB
+	db *DB // for middleware and preprocessing only
 	Tx *sql.Tx
 }
 
@@ -38,7 +38,7 @@ func (tx *Tx) Prepare(query string, args ...interface{}) (*Stmt, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Stmt{stmt, tx.db, sql}, nil
+	return &Stmt{tx.db, stmt, sql}, nil
 }
 
 // Stmt returns a transaction-specific prepared statement from an existing
