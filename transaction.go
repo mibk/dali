@@ -41,6 +41,14 @@ func (tx *Tx) Prepare(query string, args ...interface{}) (*Stmt, error) {
 	return &Stmt{stmt, tx.db, sql}, nil
 }
 
+// Stmt returns a transaction-specific prepared statement from an existing
+// statement. The returned statement operates within the transaction and can
+// no longer be used once the transaction has been committed or rolled back.
+func (tx *Tx) Stmt(stmt *Stmt) *Stmt {
+	stmt.stmt = tx.Tx.Stmt(stmt.stmt)
+	return stmt
+}
+
 // Commit commits the transaction.
 func (tx *Tx) Commit() error { return tx.Tx.Commit() }
 
