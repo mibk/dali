@@ -1,4 +1,4 @@
-package dialects
+package dialect
 
 import (
 	"bytes"

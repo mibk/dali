@@ -12,17 +12,17 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/mibk/dali/dialects"
+	"github.com/mibk/dali/dialect"
 )
 
 // A Preprocessor processes SQL queries using a dialect.
 type Preprocessor struct {
-	dialect dialects.Dialect
+	dialect dialect.Dialect
 }
 
 // NewPreprocessor creates a new Preprocessor. Processing is done
 // in the given dialect.
-func NewPreprocessor(dialect dialects.Dialect) *Preprocessor {
+func NewPreprocessor(dialect dialect.Dialect) *Preprocessor {
 	return &Preprocessor{dialect}
 }
 

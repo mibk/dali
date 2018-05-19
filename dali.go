@@ -3,7 +3,7 @@ package dali
 import (
 	"database/sql"
 
-	"github.com/mibk/dali/dialects"
+	"github.com/mibk/dali/dialect"
 )
 
 // DB wraps the sql.DB and provides slightly different
@@ -18,7 +18,7 @@ type DB struct {
 
 // NewDB instantiates DB from the given database/sql DB handle
 // in the particular dialect.
-func NewDB(db *sql.DB, dialect dialects.Dialect) *DB {
+func NewDB(db *sql.DB, dialect dialect.Dialect) *DB {
 	return &DB{
 		DB:         db,
 		preproc:    NewPreprocessor(dialect),
@@ -30,10 +30,10 @@ func NewDB(db *sql.DB, dialect dialects.Dialect) *DB {
 // selects the appropriate dialect which is inferred from the driverName.
 // It panics if the dialect is not supported by dali itself.
 func Open(driverName, dataSourceName string) (*DB, error) {
-	var dialect dialects.Dialect
+	var d dialect.Dialect
 	switch driverName {
 	case "mysql":
-		dialect = dialects.MySQL()
+		d = dialect.MySQL()
 	default:
 		panic("dali: unsupported dialect")
 	}
@@ -41,7 +41,7 @@ func Open(driverName, dataSourceName string) (*DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	return NewDB(db, dialect), nil
+	return NewDB(db, d), nil
 }
 
 // Close closes the database, releasing any open resources.
