@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
-	"time"
 )
 
 var (
@@ -95,12 +94,12 @@ func Test_One_and_All(t *testing.T) {
 		{cols("Event", "Started", "Finished"), result(SpecialStructRes{"Lunch",
 			parseTime("2015-05-05 12:24:32"), nil}),
 			newTypeOf(SpecialStruct{}), (*Query).One,
-			SpecialStruct{"Lunch", parseTime("2015-05-05 12:24:32"), NullTime{}}},
+			SpecialStruct{"Lunch", parseTime("2015-05-05 12:24:32"), sql.NullString{}}},
 		{cols("Event", "Started", "Finished"), result(SpecialStructRes{"Lunch",
-			parseTime("2015-05-05 12:24:32"), parseTime("2015-05-05 13:08:17")}),
+			parseTime("2015-05-05 12:24:32"), "2015-05-05 13:08:17"}),
 			newTypeOf(SpecialStruct{}), (*Query).One,
 			SpecialStruct{"Lunch", parseTime("2015-05-05 12:24:32"),
-				NullTime{parseTime("2015-05-05 13:08:17"), true}}},
+				sql.NullString{"2015-05-05 13:08:17", true}}},
 
 		// ignore scanner but not valuer
 		{cols("A", "B", "Scan"), result(VSres{2, 3, "group:name"}),
@@ -184,12 +183,6 @@ func TestLoading_Types(t *testing.T) {
 			sql.NullString{String: "Lucas", Valid: true}},
 		{result(struct{ A interface{} }{nil}), newTypeOf(sql.NullString{}),
 			sql.NullString{}},
-
-		// TIME
-		{result(struct{ A time.Time }{sometime}), newTypeOf(NullTime{}),
-			NullTime{sometime, true}},
-		{result(struct{ A interface{} }{nil}), newTypeOf(NullTime{}),
-			NullTime{time.Time{}, false}},
 	}
 
 	for _, tt := range tests {

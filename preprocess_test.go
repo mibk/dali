@@ -52,13 +52,13 @@ var placeholderTests = []struct {
 		"INSERT ({ID}, {First}, {Last}) VALUES (1, 'John', 'Doe')"},
 
 	// ignored embedded structs
-	{"?values", Args{SpecialStruct{"Waking up", parseTime("2015-04-05 06:07:08"), NullTime{}}},
+	{"?values", Args{SpecialStruct{"Waking up", parseTime("2015-04-05 06:07:08"), sql.NullString{}}},
 		"({Event}, {Started}, {Finished}) VALUES ('Waking up', " +
 			"'2015-04-05 06:07:08 +0000 UTC', NULL)"},
 	{"?values", Args{SpecialStruct{"Waking up", parseTime("2015-04-05 06:07:08"),
-		NullTime{parseTime("2015-04-05 06:38:15"), true}}},
+		sql.NullString{"2015-04-05 06:38:15", true}}},
 		"({Event}, {Started}, {Finished}) VALUES ('Waking up', " +
-			"'2015-04-05 06:07:08 +0000 UTC', '2015-04-05 06:38:15 +0000 UTC')"},
+			"'2015-04-05 06:07:08 +0000 UTC', '2015-04-05 06:38:15')"},
 
 	// ignore valuer but not scanner
 	{"?values", Args{VS{Val{2, 3}, Scan{"A", "B"}}}, "({Val}, {A}, {B}) VALUES (5, 'A', 'B')"},
@@ -112,7 +112,7 @@ type Omit2res struct {
 type SpecialStruct struct {
 	Event    string
 	Started  time.Time
-	Finished NullTime
+	Finished sql.NullString
 }
 
 type SpecialStructRes struct {
@@ -236,8 +236,6 @@ var typesTests = []struct {
 	// NULL
 	{"?, ?", Args{sql.NullString{String: "Homer", Valid: true}, sql.NullString{String: "Homer"}},
 		"'Homer', NULL"},
-	{"?, ?", Args{NullTime{sometime, true}, NullTime{sometime, false}},
-		"'2015-03-05 10:42:43 +0000 UTC', NULL"},
 }
 
 func TestPreprocessingTypes(t *testing.T) {
