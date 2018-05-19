@@ -6,8 +6,6 @@ import (
 	"time"
 )
 
-var d = MySQL()
-
 func TestEscapeIdent(t *testing.T) {
 	tests := []struct {
 		v   string
@@ -18,7 +16,7 @@ func TestEscapeIdent(t *testing.T) {
 	}
 	for _, tt := range tests {
 		b := new(bytes.Buffer)
-		d.EscapeIdent(b, tt.v)
+		MySQL.EscapeIdent(b, tt.v)
 		if got := b.String(); got != tt.exp {
 			t.Errorf("got %v, want %v", got, tt.exp)
 		}
@@ -35,7 +33,7 @@ func TestEscapeBool(t *testing.T) {
 	}
 	for _, tt := range tests {
 		b := new(bytes.Buffer)
-		d.EscapeBool(b, tt.v)
+		MySQL.EscapeBool(b, tt.v)
 		if got := b.String(); got != tt.exp {
 			t.Errorf("got %v, want %v", got, tt.exp)
 		}
@@ -55,7 +53,7 @@ func TestEscapeString(t *testing.T) {
 	}
 	for _, tt := range tests {
 		b := new(bytes.Buffer)
-		d.EscapeString(b, tt.v)
+		MySQL.EscapeString(b, tt.v)
 		if got := b.String(); got != tt.exp {
 			t.Errorf("got %v, want %v", got, tt.exp)
 		}
@@ -71,7 +69,7 @@ func TestEscapeBytes(t *testing.T) {
 	}
 	for _, tt := range tests {
 		b := new(bytes.Buffer)
-		d.EscapeBytes(b, tt.v)
+		MySQL.EscapeBytes(b, tt.v)
 		if got := b.String(); got != tt.exp {
 			t.Errorf("got %v, want %v", got, tt.exp)
 		}
@@ -88,7 +86,7 @@ func TestEscapeTime(t *testing.T) {
 	}
 	for _, tt := range tests {
 		b := new(bytes.Buffer)
-		d.EscapeTime(b, tt.v)
+		MySQL.EscapeTime(b, tt.v)
 		if got := b.String(); got != tt.exp {
 			t.Errorf("got %v, want %v", got, tt.exp)
 		}

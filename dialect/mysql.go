@@ -6,10 +6,8 @@ import (
 	"time"
 )
 
-// MySQL returns the MySQL dialect.
-func MySQL() Dialect {
-	return mySQL{}
-}
+// MySQL is the implementation of Dialect for MySQL drivers.
+var MySQL Dialect = mySQL{}
 
 type mySQL struct{}
 
