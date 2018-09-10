@@ -39,13 +39,13 @@ func TestScanRow(t *testing.T) {
 	}
 }
 
-func TestScanWholeCols(t *testing.T) {
+func TestScanAllRows(t *testing.T) {
 	var (
 		ids   []int64
 		names []string
 	)
 	dvr.SetColumns("ID", "Name").SetResult(U{1, "David"}, U{3, "Gareth"})
-	db.Query("").ScanWholeCols(&ids, &names)
+	db.Query("").ScanAllRows(&ids, &names)
 	expIDs := []int64{1, 3}
 	expNames := []string{"David", "Gareth"}
 	if !reflect.DeepEqual(ids, expIDs) {
