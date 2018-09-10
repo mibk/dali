@@ -401,7 +401,7 @@ func errNoCols(v interface{}) error {
 // colNamesAndFieldIndexes derives column names from a struct type and returns
 // them together with the indexes of used fields. typ must be a struct type.
 // If the tag name equals "-", the field is ignored. If insert is true,
-// fields having the omitinsert property are ignored as well.
+// fields having the selectonly property are ignored as well.
 func (p *Preprocessor) colNamesAndFieldIndexes(typ reflect.Type, insert bool) (cols []string, indexes [][]int) {
 	return p.colNamesAndFieldIndexesOfEmbedded(typ, []int{}, insert)
 }
@@ -430,7 +430,7 @@ func (p *Preprocessor) colNamesAndFieldIndexesOfEmbedded(typ reflect.Type, index
 			}
 		}
 		prop := parseFieldProp(f.Tag.Get("db"))
-		if prop.Ignore || insert && prop.OmitInsert {
+		if prop.Ignore || insert && prop.SelectOnly {
 			continue
 		}
 		if prop.Col == "" {
@@ -449,7 +449,7 @@ var (
 
 type fieldProp struct {
 	Col        string
-	OmitInsert bool
+	SelectOnly bool
 	Ignore     bool
 }
 
@@ -461,8 +461,8 @@ func parseFieldProp(s string) fieldProp {
 	p := fieldProp{Col: props[0]}
 	for _, prop := range props[1:] {
 		switch prop {
-		case "omitinsert":
-			p.OmitInsert = true
+		case "selectonly":
+			p.SelectOnly = true
 		}
 	}
 	return p

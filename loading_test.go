@@ -105,7 +105,7 @@ func Test_One_and_All(t *testing.T) {
 		{cols("A", "B", "Scan"), result(VSres{2, 3, "group:name"}),
 			newTypeOf(VS{}), (*Query).One, VS{Val{2, 3}, Scan{"group", "name"}}},
 
-		// ,omitinsert
+		// ,selectonly
 		{cols("ID", "Name", "Age"), result(Omit{1, "Barbora", 19}, Omit{4, "Bob", 23}),
 			newTypeOf([]Omit{}), (*Query).All,
 			[]Omit{{1, "Barbora", 19}, {4, "Bob", 23}},

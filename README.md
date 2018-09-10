@@ -76,7 +76,7 @@ func main() {
 }
 
 type User struct {
-	ID         int64 `db:",omitinsert"` // omitted on INSERT or UPDATE
+	ID         int64 `db:",selectonly"` // omitted on INSERT or UPDATE
 	Name       string
 	Email      string
 	GroupID    int64

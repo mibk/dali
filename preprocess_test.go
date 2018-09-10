@@ -63,7 +63,7 @@ var placeholderTests = []struct {
 	// ignore valuer but not scanner
 	{"?values", Args{VS{Val{2, 3}, Scan{"A", "B"}}}, "({Val}, {A}, {B}) VALUES (5, 'A', 'B')"},
 
-	// ,omitinsert
+	// ,selectonly
 	{"INSERT ?values", Args{Omit{Name: "John", Age: 21}},
 		"INSERT ({Name}, {Age}) VALUES ('John', 21)"},
 	{"INSERT ?values", Args{Omit2{Name: "Rudolf", Age: 28}},
@@ -92,13 +92,13 @@ type User struct {
 }
 
 type Omit struct {
-	ID   int64 `db:",omitinsert"`
+	ID   int64 `db:",selectonly"`
 	Name string
 	Age  int
 }
 
 type Omit2 struct {
-	ID   int64 `db:"Id_user,omitinsert"`
+	ID   int64 `db:"Id_user,selectonly"`
 	Name string
 	Age  int
 }
@@ -154,7 +154,7 @@ type VS struct {
 
 type OmitEverything struct {
 	A string `db:"-"`
-	B string `db:",omitinsert"`
+	B string `db:",selectonly"`
 }
 
 var errorTests = []struct {
@@ -342,7 +342,7 @@ func BenchmarkValuesClause(b *testing.B) {
 func BenchmarkSetClause(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		preproc.Process(`UPDATE ?set`, Args{struct {
-			ID   int64 `db:",omitinsert"`
+			ID   int64 `db:",selectonly"`
 			Name string
 			Age  int
 		}{0, "Veronika", 18}})
