@@ -74,9 +74,9 @@ var placeholderTests = []struct {
 }
 
 func TestPlaceholders(t *testing.T) {
-	preproc := NewPreprocessor(FakeDialect{})
+	tr := Translator{dialect: FakeDialect{}}
 	for _, tt := range placeholderTests {
-		str, err := preproc.Process(tt.sql, tt.args)
+		str, err := tr.Translate(tt.sql, tt.args)
 		if err != nil {
 			t.Fatalf("unexpected err: %s:\n %v", tt.sql, err)
 		}
@@ -171,9 +171,9 @@ func (wh *Where) And(sql string, args ...interface{}) *Where {
 	return wh
 }
 
-func (wh *Where) MarshalSQL(p *Preprocessor) (string, error) {
+func (wh *Where) MarshalSQL(t Translator) (string, error) {
 	sql := "(" + strings.Join(wh.conds, ") AND (") + ")"
-	return p.Process(sql, wh.args)
+	return t.Translate(sql, wh.args)
 }
 
 var errorTests = []struct {
@@ -215,9 +215,9 @@ var errorTests = []struct {
 }
 
 func TestErrors(t *testing.T) {
-	preproc := NewPreprocessor(FakeDialect{})
+	tr := Translator{dialect: FakeDialect{}}
 	for _, tt := range errorTests {
-		_, err := preproc.Process(tt.sql, tt.args)
+		_, err := tr.Translate(tt.sql, tt.args)
 		if err == nil {
 			t.Errorf("%s: an error was expected but none given", tt.sql)
 			continue
@@ -262,9 +262,9 @@ var typesTests = []struct {
 }
 
 func TestPreprocessingTypes(t *testing.T) {
-	preproc := NewPreprocessor(FakeDialect{})
+	tr := Translator{dialect: FakeDialect{}}
 	for _, tt := range typesTests {
-		str, err := preproc.Process(tt.sql, tt.args)
+		str, err := tr.Translate(tt.sql, tt.args)
 		if err != nil {
 			t.Fatalf("unexpected err: %s:\n %v", tt.sql, err)
 		}
@@ -298,12 +298,16 @@ var preparedStmtTests = []struct {
 	{"INSERT ?values", Args{}, "", "dali: ?values cannot be used in prepared statements"},
 	{"INSERT ?values...", Args{}, "", "dali: ?values... cannot be used in prepared statements"},
 	{"INSERT ?set", Args{}, "", "dali: ?set cannot be used in prepared statements"},
+
+	// ?sql
+	{"SELECT WHERE ?sql", Args{new(Where).And("x IN (?...)", []int{2, 3})},
+		"", "dali: marshal SQL: dali: ?... cannot be used in prepared statements"},
 }
 
 func TestPreparedStmts(t *testing.T) {
-	preproc := NewPreprocessor(FakeDialect{})
+	tr := Translator{dialect: FakeDialect{}, preparedStmt: true}
 	for _, tt := range preparedStmtTests {
-		str, err := preproc.ProcessPreparedStmt(tt.sql, tt.args)
+		str, err := tr.Translate(tt.sql, tt.args)
 		var gotErr string
 		if err != nil {
 			gotErr = err.Error()
@@ -330,31 +334,31 @@ func (NopDialect) EscapeBytes(w io.Writer, b []byte)       {}
 func (NopDialect) EscapeTime(w io.Writer, t time.Time)     {}
 func (NopDialect) PrintPlaceholderSign(w io.Writer, n int) {}
 
-var preproc = NewPreprocessor(NopDialect{})
+var trans = Translator{dialect: FakeDialect{}}
 
 func BenchmarkColumnEscaping(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		preproc.Process(`SELECT [first_name], [last_name] FROM [user]`, nil)
+		trans.Translate(`SELECT [first_name], [last_name] FROM [user]`, nil)
 	}
 }
 
 func BenchmarkBasicInterpolation(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		preproc.Process(`INSERT INTO ?ident (a, b) VALUES (?, ?)`,
+		trans.Translate(`INSERT INTO ?ident (a, b) VALUES (?, ?)`,
 			Args{"table", 3, "four"})
 	}
 }
 
 func BenchmarkSimpleValueExpansion(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		preproc.Process(`SELECT WHERE a IN (?...)`,
+		trans.Translate(`SELECT WHERE a IN (?...)`,
 			Args{[]int64{8, 99, 1013, 1202}})
 	}
 }
 
 func BenchmarkValuesClause(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		preproc.Process(`INSERT ?values`, Args{struct {
+		trans.Translate(`INSERT ?values`, Args{struct {
 			ID     int64
 			Name   string
 			Create time.Time
@@ -364,7 +368,7 @@ func BenchmarkValuesClause(b *testing.B) {
 
 func BenchmarkSetClause(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		preproc.Process(`UPDATE ?set`, Args{struct {
+		trans.Translate(`UPDATE ?set`, Args{struct {
 			ID   int64 `db:",selectonly"`
 			Name string
 			Age  int
@@ -374,7 +378,7 @@ func BenchmarkSetClause(b *testing.B) {
 
 func BenchmarkMultiValuesClause(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		preproc.Process(`INSERT ?values...`, Args{[]struct {
+		trans.Translate(`INSERT ?values...`, Args{[]struct {
 			ID   int64
 			Name string
 		}{

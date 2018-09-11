@@ -12,16 +12,16 @@ import (
 // or scanning results.
 type DB struct {
 	DB         *sql.DB
-	preproc    *Preprocessor
+	dialect    dialect.Dialect
 	middleware func(Execer) Execer
 }
 
 // NewDB instantiates DB from the given database/sql DB handle
 // in the particular dialect.
-func NewDB(db *sql.DB, dialect dialect.Dialect) *DB {
+func NewDB(db *sql.DB, d dialect.Dialect) *DB {
 	return &DB{
 		DB:         db,
-		preproc:    NewPreprocessor(dialect),
+		dialect:    d,
 		middleware: func(e Execer) Execer { return e },
 	}
 }
@@ -59,7 +59,7 @@ func (db *DB) Ping() error {
 // which is capable of executing the sql (given by the query and
 // the args) or loading the result into structs or primitive values.
 func (db *DB) Query(query string, args ...interface{}) *Query {
-	sql, err := db.preproc.Process(query, args)
+	sql, err := translate(db.dialect, query, args)
 	return &Query{
 		execer: db.middleware(db.DB),
 		query:  sql,
@@ -76,7 +76,7 @@ func (db *DB) Query(query string, args ...interface{}) *Query {
 // will be transformed into a dialect specific one to allow the parameter
 // binding.
 func (db *DB) Prepare(query string, args ...interface{}) (*Stmt, error) {
-	sql, err := db.preproc.ProcessPreparedStmt(query, args)
+	sql, err := translatePreparedStmt(db.dialect, query, args)
 	if err != nil {
 		return nil, err
 	}
@@ -96,7 +96,7 @@ func (db *DB) Begin() (*Tx, error) {
 	}
 	return &Tx{
 		Tx:         tx,
-		preproc:    db.preproc,
+		dialect:    db.dialect,
 		middleware: db.middleware,
 	}, nil
 }

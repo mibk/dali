@@ -18,54 +18,57 @@ import (
 // themselves into valid SQL. Any type that implements Marshaler can
 // be used as an argument to the ?sql placeholder.
 type Marshaler interface {
-	MarshalSQL(p *Preprocessor) (string, error)
+	MarshalSQL(t Translator) (string, error)
 }
 
-// A Preprocessor processes SQL queries using a dialect.
-type Preprocessor struct {
-	dialect dialect.Dialect
+// A Translator translates SQL queries using a dialect.
+type Translator struct {
+	dialect      dialect.Dialect
+	preparedStmt bool
+
+	err  error
+	args []interface{}
+
+	index int // of current arg
+	param int // placeholder index
 }
 
-// NewPreprocessor creates a new Preprocessor. Processing is done
-// in the given dialect.
-func NewPreprocessor(dialect dialect.Dialect) *Preprocessor {
-	return &Preprocessor{dialect}
+func translate(d dialect.Dialect, sql string, args []interface{}) (string, error) {
+	t := Translator{
+		dialect: d,
+	}
+	return t.Translate(sql, args)
+}
+func translatePreparedStmt(d dialect.Dialect, sql string, args []interface{}) (string, error) {
+	t := Translator{
+		dialect:      d,
+		preparedStmt: true,
+	}
+	return t.Translate(sql, args)
 }
 
-// Process processes the sql and the args. It returns the resulting SQL query and
-// an error if there is one.
-func (p *Preprocessor) Process(sql string, args []interface{}) (string, error) {
-	pp := &preprocessor{Preprocessor: p, args: args}
-	return pp.process(sql)
+// Translate processes sql and args using the dialect specified in t.
+// It returns the resulting SQL query and an error, if there is one.
+func (t Translator) Translate(sql string, args []interface{}) (string, error) {
+	t.args = args
+	return t.translate(sql)
 }
 
-// ProcessPreparedStmt processes the sql and the args for prepared statements.
-// It returns the resulting SQL query and an error if there is one.
-func (p *Preprocessor) ProcessPreparedStmt(sql string, args []interface{}) (string, error) {
-	pp := &preprocessor{Preprocessor: p, args: args, isPreparedStmt: true}
-	return pp.process(sql)
+func (t Translator) clone() Translator {
+	return Translator{
+		dialect:      t.dialect,
+		preparedStmt: t.preparedStmt,
+	}
 }
 
-// preprocessor represents a single preprocessing.
-type preprocessor struct {
-	*Preprocessor
-	isPreparedStmt bool
-	err            error
-	args           []interface{}
-	// Index of the current arg.
-	index int
-	// Holds the placeholder index.
-	param int
-}
-
-func (p *preprocessor) checkInterpolationOf(placeholder string) error {
-	if p.isPreparedStmt {
+func (p *Translator) checkInterpolationOf(placeholder string) error {
+	if p.preparedStmt {
 		return fmt.Errorf("dali: %s cannot be used in prepared statements", placeholder)
 	}
 	return nil
 }
 
-func (p *preprocessor) process(sql string) (string, error) {
+func (p *Translator) translate(sql string) (string, error) {
 	b := new(bytes.Buffer)
 	pos := 0
 	for pos < len(sql) {
@@ -109,7 +112,7 @@ func (p *preprocessor) process(sql string) (string, error) {
 	return b.String(), nil
 }
 
-func (p *preprocessor) nextArg() interface{} {
+func (p *Translator) nextArg() interface{} {
 	if p.index >= len(p.args) {
 		p.try(fmt.Errorf("dali: there is not enough args for placeholders"))
 		return nil
@@ -119,12 +122,12 @@ func (p *preprocessor) nextArg() interface{} {
 	return v
 }
 
-func (p *preprocessor) nextParamNumber() int {
+func (p *Translator) nextParamNumber() int {
 	p.param++
 	return p.param
 }
 
-func (p *preprocessor) interpolate(b *bytes.Buffer, typ string, expand bool) error {
+func (p *Translator) interpolate(b *bytes.Buffer, typ string, expand bool) error {
 	if expand {
 		switch typ {
 		case "":
@@ -152,7 +155,7 @@ func (p *preprocessor) interpolate(b *bytes.Buffer, typ string, expand bool) err
 	} else {
 		switch typ {
 		case "":
-			if p.isPreparedStmt {
+			if p.preparedStmt {
 				p.dialect.PrintPlaceholderSign(b, p.nextParamNumber())
 				return nil
 			}
@@ -173,7 +176,7 @@ func (p *preprocessor) interpolate(b *bytes.Buffer, typ string, expand bool) err
 		case "sql":
 			switch arg := p.nextArg().(type) {
 			case Marshaler:
-				sql, err := arg.MarshalSQL(p.Preprocessor)
+				sql, err := arg.MarshalSQL(p.clone())
 				if err != nil {
 					return fmt.Errorf("dali: marshal SQL: %v", err)
 				}
@@ -190,14 +193,14 @@ func (p *preprocessor) interpolate(b *bytes.Buffer, typ string, expand bool) err
 	return p.err
 }
 
-func (p *preprocessor) try(err error) error {
+func (p *Translator) try(err error) error {
 	if p.err == nil {
 		p.err = err
 	}
 	return p.err
 }
 
-func (p *Preprocessor) escapeValue(b *bytes.Buffer, v interface{}) error {
+func (p *Translator) escapeValue(b *bytes.Buffer, v interface{}) error {
 	if valuer, ok := v.(driver.Valuer); ok {
 		var err error
 		if v, err = valuer.Value(); err != nil {
@@ -260,7 +263,7 @@ func formatInt(b *bytes.Buffer, i int64)     { b.WriteString(strconv.FormatInt(i
 func formatUint(b *bytes.Buffer, u uint64)   { b.WriteString(strconv.FormatUint(u, 10)) }
 func formatFloat(b *bytes.Buffer, f float64) { b.WriteString(strconv.FormatFloat(f, 'f', -1, 64)) }
 
-func (p *Preprocessor) escapeMultipleValues(b *bytes.Buffer, v interface{}) error {
+func (p *Translator) escapeMultipleValues(b *bytes.Buffer, v interface{}) error {
 	vv := reflect.ValueOf(v)
 	if vv.Kind() != reflect.Slice {
 		return fmt.Errorf("dali: ?... expects the argument to be a slice")
@@ -280,7 +283,7 @@ func (p *Preprocessor) escapeMultipleValues(b *bytes.Buffer, v interface{}) erro
 	return nil
 }
 
-func (p *Preprocessor) printValuesClause(b *bytes.Buffer, v interface{}) error {
+func (p *Translator) printValuesClause(b *bytes.Buffer, v interface{}) error {
 	cols, vals, err := p.deriveColsAndVals(v)
 	if err != nil {
 		return err
@@ -303,7 +306,7 @@ func (p *Preprocessor) printValuesClause(b *bytes.Buffer, v interface{}) error {
 	return nil
 }
 
-func (p *Preprocessor) printSetClause(b *bytes.Buffer, v interface{}) error {
+func (p *Translator) printSetClause(b *bytes.Buffer, v interface{}) error {
 	cols, vals, err := p.deriveColsAndVals(v)
 	if err != nil {
 		return err
@@ -323,7 +326,7 @@ func (p *Preprocessor) printSetClause(b *bytes.Buffer, v interface{}) error {
 
 // deriveColsAndVals derives column names from an underlying type of v and returns
 // them together with the corresponding values.
-func (p *Preprocessor) deriveColsAndVals(v interface{}) (cols []string, vals []interface{}, err error) {
+func (p *Translator) deriveColsAndVals(v interface{}) (cols []string, vals []interface{}, err error) {
 	switch v := v.(type) {
 	case Map:
 		keys := make([]string, 0, len(v))
@@ -353,7 +356,7 @@ func (p *Preprocessor) deriveColsAndVals(v interface{}) (cols []string, vals []i
 	return
 }
 
-func (p *Preprocessor) printMultiValuesClause(b *bytes.Buffer, v interface{}) error {
+func (p *Translator) printMultiValuesClause(b *bytes.Buffer, v interface{}) error {
 	errInvalidArg := fmt.Errorf("dali: ?values... expects the argument to be a slice of structs")
 	vv := reflect.ValueOf(v)
 	if vv.Kind() != reflect.Slice {

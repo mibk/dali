@@ -1,19 +1,23 @@
 package dali
 
-import "database/sql"
+import (
+	"database/sql"
+
+	"github.com/mibk/dali/dialect"
+)
 
 // Tx wraps the sql.Tx to provide the Query method instead
 // of the sql.Tx's original methods for comunication with
 // the database.
 type Tx struct {
 	Tx         *sql.Tx
-	preproc    *Preprocessor
+	dialect    dialect.Dialect
 	middleware func(Execer) Execer
 }
 
 // Query is a (*DB).Query equivalent for transactions.
 func (tx *Tx) Query(query string, args ...interface{}) *Query {
-	sql, err := tx.preproc.Process(query, args)
+	sql, err := translate(tx.dialect, query, args)
 	return &Query{
 		execer: tx.middleware(tx.Tx),
 		query:  sql,
@@ -30,7 +34,7 @@ func (tx *Tx) Query(query string, args ...interface{}) *Query {
 // will be transformed into a dialect specific one to allow the parameter
 // binding.
 func (tx *Tx) Prepare(query string, args ...interface{}) (*Stmt, error) {
-	sql, err := tx.preproc.ProcessPreparedStmt(query, args)
+	sql, err := translatePreparedStmt(tx.dialect, query, args)
 	if err != nil {
 		return nil, err
 	}
