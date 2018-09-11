@@ -8,11 +8,10 @@ import (
 // Query represents an arbitrary SQL statement.
 // The SQL is preprocessed by Preprocessor before running.
 type Query struct {
-	execer  Execer
-	preproc *Preprocessor
-	query   string
-	args    []interface{}
-	err     error
+	execer Execer
+	query  string
+	args   []interface{}
+	err    error
 }
 
 // Exec executes the query that shouldn't return rows.

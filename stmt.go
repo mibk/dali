@@ -13,10 +13,9 @@ type Stmt struct {
 // ready to be executed. See (*DB).Query method.
 func (s *Stmt) Bind(args ...interface{}) *Query {
 	return &Query{
-		execer:  s.db.middleware(stmtExecer{s.stmt}),
-		preproc: s.db.preproc,
-		query:   s.sql,
-		args:    args,
+		execer: s.db.middleware(stmtExecer{s.stmt}),
+		query:  s.sql,
+		args:   args,
 	}
 }
 

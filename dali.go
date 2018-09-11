@@ -61,10 +61,9 @@ func (db *DB) Ping() error {
 func (db *DB) Query(query string, args ...interface{}) *Query {
 	sql, err := db.preproc.Process(query, args)
 	return &Query{
-		execer:  db.middleware(db.DB),
-		preproc: db.preproc,
-		query:   sql,
-		err:     err,
+		execer: db.middleware(db.DB),
+		query:  sql,
+		err:    err,
 	}
 }
 

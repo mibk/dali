@@ -14,10 +14,9 @@ type Tx struct {
 func (tx *Tx) Query(query string, args ...interface{}) *Query {
 	sql, err := tx.db.preproc.Process(query, args)
 	return &Query{
-		execer:  tx.db.middleware(tx.Tx),
-		preproc: tx.db.preproc,
-		query:   sql,
-		err:     err,
+		execer: tx.db.middleware(tx.Tx),
+		query:  sql,
+		err:    err,
 	}
 }
 
