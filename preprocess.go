@@ -280,9 +280,6 @@ func (p *Preprocessor) escapeMultipleValues(b *bytes.Buffer, v interface{}) erro
 	return nil
 }
 
-// Map is just an alias for map[string]interface{}.
-type Map map[string]interface{}
-
 func (p *Preprocessor) printValuesClause(b *bytes.Buffer, v interface{}) error {
 	cols, vals, err := p.deriveColsAndVals(v)
 	if err != nil {
