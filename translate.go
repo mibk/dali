@@ -51,7 +51,11 @@ func translatePreparedStmt(d dialect.Dialect, sql string, args []interface{}) (s
 // It returns the resulting SQL query and an error, if there is one.
 func (t Translator) Translate(sql string, args []interface{}) (string, error) {
 	t.args = args
-	return t.translate(sql)
+	s, err := t.translate(sql)
+	if err != nil {
+		return "", fmt.Errorf("dali: %v", err)
+	}
+	return s, nil
 }
 
 func (t Translator) clone() Translator {
@@ -63,7 +67,7 @@ func (t Translator) clone() Translator {
 
 func (p *Translator) checkInterpolationOf(placeholder string) error {
 	if p.preparedStmt {
-		return fmt.Errorf("dali: %s cannot be used in prepared statements", placeholder)
+		return fmt.Errorf("%s cannot be used in prepared statements", placeholder)
 	}
 	return nil
 }
@@ -79,7 +83,7 @@ func (p *Translator) translate(sql string) (string, error) {
 		case '[':
 			w := strings.IndexRune(sql[pos:], ']')
 			if w == -1 {
-				return "", fmt.Errorf("dali: identifier not terminated")
+				return "", fmt.Errorf("identifier not terminated")
 			}
 			col := sql[pos : pos+w]
 			p.dialect.EscapeIdent(b, col)
@@ -107,14 +111,14 @@ func (p *Translator) translate(sql string) (string, error) {
 		}
 	}
 	if p.index < len(p.args) {
-		return "", fmt.Errorf("dali: only %d args are expected", p.index)
+		return "", fmt.Errorf("only %d args are expected", p.index)
 	}
 	return b.String(), nil
 }
 
 func (p *Translator) nextArg() interface{} {
 	if p.index >= len(p.args) {
-		p.try(fmt.Errorf("dali: there is not enough args for placeholders"))
+		p.try(fmt.Errorf("there is not enough args for placeholders"))
 		return nil
 	}
 	v := p.args[p.index]
@@ -136,9 +140,9 @@ func (p *Translator) interpolate(b *bytes.Buffer, typ string, expand bool) error
 		case "ident":
 			idents, ok := p.nextArg().([]string)
 			if !ok {
-				return fmt.Errorf("dali: ?ident... expects the argument to be a []string")
+				return fmt.Errorf("?ident... expects the argument to be a []string")
 			} else if len(idents) == 0 {
-				return fmt.Errorf("dali: empty slice passed to ?ident...")
+				return fmt.Errorf("empty slice passed to ?ident...")
 			}
 			for i, ident := range idents {
 				p.dialect.EscapeIdent(b, ident)
@@ -150,7 +154,7 @@ func (p *Translator) interpolate(b *bytes.Buffer, typ string, expand bool) error
 			p.try(p.checkInterpolationOf("?values..."))
 			p.try(p.printMultiValuesClause(b, p.nextArg()))
 		default:
-			return fmt.Errorf("dali: ?%s cannot be expanded (...) or doesn't exist", typ)
+			return fmt.Errorf("?%s cannot be expanded (...) or doesn't exist", typ)
 		}
 	} else {
 		switch typ {
@@ -164,7 +168,7 @@ func (p *Translator) interpolate(b *bytes.Buffer, typ string, expand bool) error
 			ident, ok := p.nextArg().(string)
 			if !ok {
 				return p.try(
-					fmt.Errorf("dali: ?ident expects the argument to be a string"))
+					fmt.Errorf("?ident expects the argument to be a string"))
 			}
 			p.dialect.EscapeIdent(b, ident)
 		case "values":
@@ -178,16 +182,16 @@ func (p *Translator) interpolate(b *bytes.Buffer, typ string, expand bool) error
 			case Marshaler:
 				sql, err := arg.MarshalSQL(p.clone())
 				if err != nil {
-					return fmt.Errorf("dali: marshal SQL: %v", err)
+					return fmt.Errorf("marshal SQL: %v", err)
 				}
 				b.WriteString(sql)
 			case string:
 				b.WriteString(arg)
 			default:
-				return fmt.Errorf("dali: ?sql expects the argument to be a string or Marshaler")
+				return fmt.Errorf("?sql expects the argument to be a string or Marshaler")
 			}
 		default:
-			return fmt.Errorf("dali: unknown placeholder ?%s", typ)
+			return fmt.Errorf("unknown placeholder ?%s", typ)
 		}
 	}
 	return p.err
@@ -254,7 +258,7 @@ func (p *Translator) escapeValue(b *bytes.Buffer, v interface{}) error {
 	case time.Time:
 		p.dialect.EscapeTime(b, v)
 	default:
-		return fmt.Errorf("dali: invalid argument type: %T", v)
+		return fmt.Errorf("invalid argument type: %T", v)
 	}
 	return nil
 }
@@ -266,11 +270,11 @@ func formatFloat(b *bytes.Buffer, f float64) { b.WriteString(strconv.FormatFloat
 func (p *Translator) escapeMultipleValues(b *bytes.Buffer, v interface{}) error {
 	vv := reflect.ValueOf(v)
 	if vv.Kind() != reflect.Slice {
-		return fmt.Errorf("dali: ?... expects the argument to be a slice")
+		return fmt.Errorf("?... expects the argument to be a slice")
 	}
 	length := vv.Len()
 	if length == 0 {
-		return fmt.Errorf("dali: empty slice passed to ?...")
+		return fmt.Errorf("empty slice passed to ?...")
 	}
 	for i := 0; i < length; i++ {
 		if err := p.escapeValue(b, vv.Index(i).Interface()); err != nil {
@@ -344,7 +348,7 @@ func (p *Translator) deriveColsAndVals(v interface{}) (cols []string, vals []int
 			vv = reflect.Indirect(vv)
 		}
 		if vv.Kind() != reflect.Struct {
-			return nil, nil, fmt.Errorf("dali: argument must be a pointer to a struct")
+			return nil, nil, fmt.Errorf("argument must be a pointer to a struct")
 		}
 		var indexes [][]int
 		cols, indexes = colNamesAndFieldIndexes(vv.Type(), true)
@@ -357,7 +361,7 @@ func (p *Translator) deriveColsAndVals(v interface{}) (cols []string, vals []int
 }
 
 func (p *Translator) printMultiValuesClause(b *bytes.Buffer, v interface{}) error {
-	errInvalidArg := fmt.Errorf("dali: ?values... expects the argument to be a slice of structs")
+	errInvalidArg := fmt.Errorf("?values... expects the argument to be a slice of structs")
 	vv := reflect.ValueOf(v)
 	if vv.Kind() != reflect.Slice {
 		return errInvalidArg
@@ -372,7 +376,7 @@ func (p *Translator) printMultiValuesClause(b *bytes.Buffer, v interface{}) erro
 		return errInvalidArg
 	}
 	if vv.Len() == 0 {
-		return fmt.Errorf("dali: empty slice passed to ?values...")
+		return fmt.Errorf("empty slice passed to ?values...")
 	}
 	cols, indexes := colNamesAndFieldIndexes(el, true)
 	if len(cols) == 0 {
@@ -408,7 +412,7 @@ func (p *Translator) printMultiValuesClause(b *bytes.Buffer, v interface{}) erro
 }
 
 func errNoCols(v interface{}) error {
-	return fmt.Errorf("dali: no columns derived from %T", v)
+	return fmt.Errorf("no columns derived from %T", v)
 }
 
 func valuesByFieldIndexes(v reflect.Value, indexes [][]int) (vals []interface{}) {
