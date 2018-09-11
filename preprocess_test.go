@@ -22,8 +22,6 @@ var placeholderTests = []struct {
 	{"SELECT ?ident...", Args{[]string{"col1", "col2", "another"}},
 		"SELECT {col1}, {col2}, {another}"},
 
-	{"SELECT ?sql", Args{"* FROM user"}, "SELECT * FROM user"},
-
 	{"INSERT INTO [user] ?values", Args{User{1, "Salvador", 0}},
 		"INSERT INTO {user} ({id}, {user_name}) VALUES (1, 'Salvador')"},
 	{"INSERT INTO [user] ?values...", Args{[]User{
@@ -68,6 +66,11 @@ var placeholderTests = []struct {
 		"INSERT ({Name}, {Age}) VALUES ('John', 21)"},
 	{"INSERT ?values", Args{Omit2{Name: "Rudolf", Age: 28}},
 		"INSERT ({Name}, {Age}) VALUES ('Rudolf', 28)"},
+
+	// ?sql
+	{"SELECT ?sql", Args{"* FROM user"}, "SELECT * FROM user"},
+	{"SELECT WHERE ?sql", Args{new(Where).And("name = ?", "Josef").And("age > ?", 30)},
+		"SELECT WHERE (name = 'Josef') AND (age > 30)"},
 }
 
 func TestPlaceholders(t *testing.T) {
@@ -157,6 +160,22 @@ type OmitEverything struct {
 	B string `db:",selectonly"`
 }
 
+type Where struct {
+	conds []string
+	args  []interface{}
+}
+
+func (wh *Where) And(sql string, args ...interface{}) *Where {
+	wh.conds = append(wh.conds, sql)
+	wh.args = append(wh.args, args...)
+	return wh
+}
+
+func (wh *Where) MarshalSQL(p *Preprocessor) (string, error) {
+	sql := "(" + strings.Join(wh.conds, ") AND (") + ")"
+	return p.Process(sql, wh.args)
+}
+
 var errorTests = []struct {
 	sql  string
 	args []interface{}
@@ -166,7 +185,6 @@ var errorTests = []struct {
 	{"INSERT INTO ?ident", Args{}, "dali: there is not enough args for placeholders"},
 	{"SELECT ?, ?", Args{3, 4, 5}, "dali: only 2 args are expected"},
 	{"INSERT INTO ?ident", Args{5}, "dali: ?ident expects the argument to be a string"},
-	{"INSERT INTO ?sql", Args{5}, "dali: ?sql expects the argument to be a string"},
 	{"INSERT INTO ?u", Args{5}, "dali: unknown placeholder ?u"},
 	{"INSERT ?u...", Args{nil}, "dali: ?u cannot be expanded (...) or doesn't exist"},
 	{"INSERT INTO ?", Args{func() {}}, "dali: invalid argument type: func()"},
@@ -189,6 +207,11 @@ var errorTests = []struct {
 	{"INSERT ?values...", Args{[]struct{}{{}}}, "dali: no columns derived from []struct {}"},
 	{"INSERT ?values", Args{OmitEverything{}}, "dali: no columns derived from dali.OmitEverything"},
 	{"INSERT ?set", Args{struct{}{}}, "dali: no columns derived from struct {}"},
+
+	// ?sql
+	{"INSERT INTO ?sql", Args{5}, "dali: ?sql expects the argument to be a string or Marshaler"},
+	{"SELECT WHERE ?sql", Args{new(Where).And("?")},
+		"dali: marshal SQL: dali: there is not enough args for placeholders"},
 }
 
 func TestErrors(t *testing.T) {

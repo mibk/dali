@@ -15,6 +15,13 @@ import (
 	"github.com/mibk/dali/dialect"
 )
 
+// Marshaler is the interface implemented by types that can marshal
+// themselves into valid SQL. Any type that implements Marshaler can
+// be used as an argument to the ?sql placeholder.
+type Marshaler interface {
+	MarshalSQL(p *Preprocessor) (string, error)
+}
+
 // A Preprocessor processes SQL queries using a dialect.
 type Preprocessor struct {
 	dialect dialect.Dialect
@@ -165,11 +172,18 @@ func (p *preprocessor) interpolate(b *bytes.Buffer, typ string, expand bool) err
 			p.try(p.checkInterpolationOf("?set"))
 			p.try(p.printSetClause(b, p.nextArg()))
 		case "sql":
-			sql, ok := p.nextArg().(string)
-			if !ok {
-				return fmt.Errorf("dali: ?sql expects the argument to be a string")
+			switch arg := p.nextArg().(type) {
+			case Marshaler:
+				sql, err := arg.MarshalSQL(p.Preprocessor)
+				if err != nil {
+					return fmt.Errorf("dali: marshal SQL: %v", err)
+				}
+				b.WriteString(sql)
+			case string:
+				b.WriteString(arg)
+			default:
+				return fmt.Errorf("dali: ?sql expects the argument to be a string or Marshaler")
 			}
-			b.WriteString(sql)
 		default:
 			return fmt.Errorf("dali: unknown placeholder ?%s", typ)
 		}
