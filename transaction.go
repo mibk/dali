@@ -6,15 +6,16 @@ import "database/sql"
 // of the sql.Tx's original methods for comunication with
 // the database.
 type Tx struct {
-	db *DB // for middleware and preprocessing only
-	Tx *sql.Tx
+	Tx         *sql.Tx
+	preproc    *Preprocessor
+	middleware func(Execer) Execer
 }
 
 // Query is a (*DB).Query equivalent for transactions.
 func (tx *Tx) Query(query string, args ...interface{}) *Query {
-	sql, err := tx.db.preproc.Process(query, args)
+	sql, err := tx.preproc.Process(query, args)
 	return &Query{
-		execer: tx.db.middleware(tx.Tx),
+		execer: tx.middleware(tx.Tx),
 		query:  sql,
 		err:    err,
 	}
@@ -29,7 +30,7 @@ func (tx *Tx) Query(query string, args ...interface{}) *Query {
 // will be transformed into a dialect specific one to allow the parameter
 // binding.
 func (tx *Tx) Prepare(query string, args ...interface{}) (*Stmt, error) {
-	sql, err := tx.db.preproc.ProcessPreparedStmt(query, args)
+	sql, err := tx.preproc.ProcessPreparedStmt(query, args)
 	if err != nil {
 		return nil, err
 	}
@@ -37,7 +38,7 @@ func (tx *Tx) Prepare(query string, args ...interface{}) (*Stmt, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Stmt{tx.db, stmt, sql}, nil
+	return &Stmt{stmt, sql, tx.middleware}, nil
 }
 
 // Stmt returns a transaction-specific prepared statement from an existing

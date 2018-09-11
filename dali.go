@@ -84,7 +84,7 @@ func (db *DB) Prepare(query string, args ...interface{}) (*Stmt, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Stmt{db, stmt, sql}, nil
+	return &Stmt{stmt, sql, db.middleware}, nil
 }
 
 // Begin starts a transaction. The isolation level is dependent on
@@ -95,8 +95,9 @@ func (db *DB) Begin() (*Tx, error) {
 		return nil, err
 	}
 	return &Tx{
-		db: db,
-		Tx: tx,
+		Tx:         tx,
+		preproc:    db.preproc,
+		middleware: db.middleware,
 	}, nil
 }
 

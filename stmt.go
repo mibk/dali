@@ -4,16 +4,16 @@ import "database/sql"
 
 // Stmt is a prepared statement.
 type Stmt struct {
-	db   *DB // for middleware and preprocessing only
-	stmt *sql.Stmt
-	sql  string
+	stmt       *sql.Stmt
+	sql        string
+	middleware func(Execer) Execer
 }
 
 // Bind binds args to the prepared statement and returns a Query struct
 // ready to be executed. See (*DB).Query method.
 func (s *Stmt) Bind(args ...interface{}) *Query {
 	return &Query{
-		execer: s.db.middleware(stmtExecer{s.stmt}),
+		execer: s.middleware(stmtExecer{s.stmt}),
 		query:  s.sql,
 		args:   args,
 	}
