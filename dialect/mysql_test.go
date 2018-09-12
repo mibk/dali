@@ -77,18 +77,36 @@ func TestEscapeBytes(t *testing.T) {
 }
 
 func TestEscapeTime(t *testing.T) {
-	tim, _ := time.Parse(time.Kitchen, "3:40AM")
 	tests := []struct {
 		v   time.Time
 		exp string
 	}{
-		{tim, "'" + tim.Format(mysqlTimeFormat) + "'"},
+		{
+			time.Date(2018, 9, 12, 8, 24, 37, 0, time.UTC),
+			"'2018-09-12 08:24:37'",
+		},
+		{
+			time.Date(2018, 9, 12, 9, 1, 2, 304000000, time.UTC),
+			"'2018-09-12 09:01:02.304'",
+		},
+		{
+			time.Date(2018, 9, 12, 9, 1, 2, 999999000, time.UTC),
+			"'2018-09-12 09:01:02.999999'",
+		},
+		{
+			time.Date(2018, 9, 12, 9, 1, 2, 1000, time.UTC),
+			"'2018-09-12 09:01:02.000001'",
+		},
+		{
+			time.Date(2018, 9, 12, 9, 1, 3, 900, time.UTC),
+			"'2018-09-12 09:01:03'",
+		},
 	}
 	for _, tt := range tests {
 		b := new(bytes.Buffer)
 		MySQL.EscapeTime(b, tt.v)
 		if got := b.String(); got != tt.exp {
-			t.Errorf("got %v, want %v", got, tt.exp)
+			t.Errorf("%v: got %v, want %v", tt.v, got, tt.exp)
 		}
 	}
 }

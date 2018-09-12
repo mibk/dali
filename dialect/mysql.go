@@ -66,7 +66,9 @@ func escapeBytes(w io.Writer, bytes []byte) {
 	writeByte(w, '\'')
 }
 
-const mysqlTimeFormat = "2006-01-02 15:04:05"
+// According to https://dev.mysql.com/doc/refman/8.0/en/datetime.html,
+// the time precision should be up to microseconds (6 digits).
+const mysqlTimeFormat = "2006-01-02 15:04:05.999999"
 
 func (mySQL) EscapeTime(w io.Writer, t time.Time) {
 	writeByte(w, '\'')
