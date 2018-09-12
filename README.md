@@ -76,10 +76,10 @@ func main() {
 }
 
 type User struct {
-	ID         int64 `db:",selectonly"` // omitted on INSERT or UPDATE
-	Name       string
-	Email      string
-	GroupID    int64
+	ID         int64     `db:",selectonly"` // omitted on INSERT, UPDATE, etc.
+	Name       string    `db:"name"`
+	Email      string    `db:"email"`
+	GroupID    int64     `db:"group_id"`
 	Registered time.Time `db:"created"`
 }
 ```
@@ -90,7 +90,7 @@ type User struct {
 $ go get github.com/mibk/dali
 ```
 
-## Issues
+## Caveats
 
 DALí processes the query unaware of the actual SQL syntax. This means it is quite stupid
 on deciding whether the placeholder is inside a string literal.
@@ -145,8 +145,8 @@ Using the placeholders it is easy and quite expressive to write common SQL queri
 also possible to adjust these queries to a specific need (which is often not so easy when using
 query builders).
 
-*Note*: only `?`, `?ident`, `?ident...`, and `?sql` are allowed in prepared statements (see Prepare method's
-doc for more information).
+*Note*: only `?`, `?ident`, `?ident...`, and `?sql` are allowed in prepared statements (see the
+method Prepare for more information).
 
 ### Profiling and other
 
