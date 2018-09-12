@@ -7,6 +7,10 @@ import (
 )
 
 // MySQL is the implementation of Dialect for MySQL drivers.
+//
+// Note that the EscapeTime method ignores the time zone, so if you
+// want to work with time zones different from your MySQL connection
+// time zone setting, you must convert it first.
 var MySQL Dialect = mySQL{}
 
 type mySQL struct{}
