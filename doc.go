@@ -23,7 +23,7 @@
 //              INSERT clause
 //   ?ident     used for identifiers (column or table name)
 //   ?ident...  expands identifiers and separates them with a comma
-//   ?sql       inserts the parameter as is (meant for SQL parts)
+//   ?sql       inserts the parameter, a string or Marshaler, as is (meant for SQL parts)
 //
 // Prepared statements
 //
