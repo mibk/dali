@@ -1,6 +1,7 @@
 package dali
 
 import (
+	"context"
 	"database/sql"
 
 	"github.com/mibk/dali/dialect"
@@ -55,16 +56,47 @@ func (db *DB) Ping() error {
 	return db.DB.Ping()
 }
 
-// Query is a fundamental method of DB. It returns a Query struct
+// QueryWithContext is a fundamental method of DB. It returns a Query struct
 // which is capable of executing the sql (given by the query and
 // the args) or loading the result into structs or primitive values.
-func (db *DB) Query(query string, args ...interface{}) *Query {
+func (db *DB) QueryWithContext(ctx context.Context, query string, args ...interface{}) *Query {
 	sql, err := translate(db.dialect, query, args)
 	return &Query{
+		ctx:    ctx,
 		execer: db.middleware(db.DB),
 		query:  sql,
 		err:    err,
 	}
+}
+
+// Query is a fundamental method of DB. It returns a Query struct
+// which is capable of executing the sql (given by the query and
+// the args) or loading the result into structs or primitive values.
+func (db *DB) Query(query string, args ...interface{}) *Query {
+	return db.QueryWithContext(context.Background(), query, args...)
+}
+
+// PrepareContext creates a prepared statement for later queries or executions.
+// The caller must call the statement's Close method when the statement
+// is no longer needed. Unlike the Prepare methods in database/sql this
+// method also accepts args, which are meant only for query building.
+// Therefore, only ?ident, ?ident..., ?sql are interpolated in this phase.
+// Apart of that, ? is the only other placeholder allowed (this one
+// will be transformed into a dialect specific one to allow the parameter
+// binding.
+//
+// The provided context is used for the preparation of the statement, not
+// for the execution of the statement.
+func (db *DB) PrepareContext(ctx context.Context, query string, args ...interface{}) (*Stmt, error) {
+	sql, err := translatePreparedStmt(db.dialect, query, args)
+	if err != nil {
+		return nil, err
+	}
+	stmt, err := db.DB.PrepareContext(ctx, sql)
+	if err != nil {
+		return nil, err
+	}
+	return &Stmt{stmt, sql, db.middleware}, nil
 }
 
 // Prepare creates a prepared statement for later queries or executions.
@@ -76,21 +108,21 @@ func (db *DB) Query(query string, args ...interface{}) *Query {
 // will be transformed into a dialect specific one to allow the parameter
 // binding.
 func (db *DB) Prepare(query string, args ...interface{}) (*Stmt, error) {
-	sql, err := translatePreparedStmt(db.dialect, query, args)
-	if err != nil {
-		return nil, err
-	}
-	stmt, err := db.DB.Prepare(sql)
-	if err != nil {
-		return nil, err
-	}
-	return &Stmt{stmt, sql, db.middleware}, nil
+	return db.PrepareContext(context.Background(), query, args...)
 }
 
-// Begin starts a transaction. The isolation level is dependent on
-// the driver.
-func (db *DB) Begin() (*Tx, error) {
-	tx, err := db.DB.Begin()
+// BeginTx starts a transaction.
+//
+// The provided context is used until the transaction is committed or rolled back.
+// If the context is canceled, the sql package will roll back
+// the transaction. Tx.Commit will return an error if the context provided to
+// BeginTx is canceled.
+//
+// The provided TxOptions is optional and may be nil if defaults should be used.
+// If a non-default isolation level is used that the driver doesn't support,
+// an error will be returned.
+func (db *DB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) {
+	tx, err := db.DB.BeginTx(ctx, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -99,6 +131,12 @@ func (db *DB) Begin() (*Tx, error) {
 		dialect:    db.dialect,
 		middleware: db.middleware,
 	}, nil
+}
+
+// Begin starts a transaction. The isolation level is dependent on
+// the driver.
+func (db *DB) Begin() (*Tx, error) {
+	return db.BeginTx(context.Background(), nil)
 }
 
 // SetMiddlewareFunc changes the DB middleware func. Default func
@@ -111,9 +149,9 @@ func (db *DB) SetMiddlewareFunc(f func(Execer) Execer) {
 
 // Execer is an interface that Query works with.
 type Execer interface {
-	Exec(query string, args ...interface{}) (sql.Result, error)
-	Query(query string, args ...interface{}) (*sql.Rows, error)
-	QueryRow(query string, args ...interface{}) *sql.Row
+	ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error)
+	QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error)
+	QueryRowContext(ctx context.Context, query string, args ...interface{}) *sql.Row
 }
 
 // LastInsertID is a helper that wraps a call to a function returning

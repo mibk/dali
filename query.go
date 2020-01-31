@@ -1,6 +1,7 @@
 package dali
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 )
@@ -8,6 +9,7 @@ import (
 // Query represents an arbitrary SQL statement.
 // The SQL is preprocessed by Preprocessor before running.
 type Query struct {
+	ctx    context.Context
 	execer Execer
 	query  string
 	args   []interface{}
@@ -20,7 +22,7 @@ func (q *Query) Exec() (sql.Result, error) {
 	if q.err != nil {
 		return nil, q.err
 	}
-	return q.execer.Exec(q.query, q.args...)
+	return q.execer.ExecContext(q.ctx, q.query, q.args...)
 }
 
 // Rows executes that query that should return rows, typically a SELECT.
@@ -28,7 +30,7 @@ func (q *Query) Rows() (*sql.Rows, error) {
 	if q.err != nil {
 		return nil, q.err
 	}
-	return q.execer.Query(q.query, q.args...)
+	return q.execer.QueryContext(q.ctx, q.query, q.args...)
 }
 
 // ScanRow executes the query that is expected to return at most one row.
@@ -40,7 +42,7 @@ func (q *Query) ScanRow(dest ...interface{}) error {
 	if q.err != nil {
 		return q.err
 	}
-	return q.execer.QueryRow(q.query, q.args...).Scan(dest...)
+	return q.execer.QueryRowContext(q.ctx, q.query, q.args...).Scan(dest...)
 }
 
 func (q *Query) String() string {

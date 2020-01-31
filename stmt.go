@@ -1,6 +1,9 @@
 package dali
 
-import "database/sql"
+import (
+	"context"
+	"database/sql"
+)
 
 // Stmt is a prepared statement.
 type Stmt struct {
@@ -9,14 +12,21 @@ type Stmt struct {
 	middleware func(Execer) Execer
 }
 
-// Bind binds args to the prepared statement and returns a Query struct
+// BindContext binds args to the prepared statement and returns a Query struct
 // ready to be executed. See (*DB).Query method.
-func (s *Stmt) Bind(args ...interface{}) *Query {
+func (s *Stmt) BindContext(ctx context.Context, args ...interface{}) *Query {
 	return &Query{
+		ctx:    ctx,
 		execer: s.middleware(stmtExecer{s.stmt}),
 		query:  s.sql,
 		args:   args,
 	}
+}
+
+// Bind binds args to the prepared statement and returns a Query struct
+// ready to be executed. See (*DB).Query method.
+func (s *Stmt) Bind(args ...interface{}) *Query {
+	return s.BindContext(context.Background(), args...)
 }
 
 // Close closes the statement.
@@ -33,14 +43,14 @@ type stmtExecer struct {
 	stmt *sql.Stmt
 }
 
-func (s stmtExecer) Exec(_ string, args ...interface{}) (sql.Result, error) {
-	return s.stmt.Exec(args...)
+func (s stmtExecer) ExecContext(ctx context.Context, _ string, args ...interface{}) (sql.Result, error) {
+	return s.stmt.ExecContext(ctx, args...)
 }
 
-func (s stmtExecer) Query(_ string, args ...interface{}) (*sql.Rows, error) {
-	return s.stmt.Query(args...)
+func (s stmtExecer) QueryContext(ctx context.Context, _ string, args ...interface{}) (*sql.Rows, error) {
+	return s.stmt.QueryContext(ctx, args...)
 }
 
-func (s stmtExecer) QueryRow(_ string, args ...interface{}) *sql.Row {
-	return s.stmt.QueryRow(args...)
+func (s stmtExecer) QueryRowContext(ctx context.Context, _ string, args ...interface{}) *sql.Row {
+	return s.stmt.QueryRowContext(ctx, args...)
 }

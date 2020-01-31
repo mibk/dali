@@ -1,6 +1,7 @@
 package dali
 
 import (
+	"context"
 	"database/sql"
 	"testing"
 )
@@ -51,19 +52,19 @@ type middle struct {
 	lastq string
 }
 
-func (p *middle) Exec(query string, args ...interface{}) (sql.Result, error) {
+func (p *middle) ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error) {
 	p.lastq = query + "-exec"
-	return p.ex.Exec(query, args...)
+	return p.ex.ExecContext(ctx, query, args...)
 }
 
-func (p *middle) Query(query string, args ...interface{}) (*sql.Rows, error) {
+func (p *middle) QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error) {
 	p.lastq = query + "-query"
-	return p.ex.Query(query, args...)
+	return p.ex.QueryContext(ctx, query, args...)
 }
 
-func (p *middle) QueryRow(query string, args ...interface{}) *sql.Row {
+func (p *middle) QueryRowContext(ctx context.Context, query string, args ...interface{}) *sql.Row {
 	p.lastq = query + "-queryrow"
-	return p.ex.QueryRow(query, args...)
+	return p.ex.QueryRowContext(ctx, query, args...)
 }
 
 func (db *DB) mustPrepare(query string, args ...interface{}) *Stmt {
