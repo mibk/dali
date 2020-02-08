@@ -77,8 +77,10 @@ func (tx *Tx) Prepare(query string, args ...interface{}) (*Stmt, error) {
 // longer be used once the transaction has been committed or rolled
 // back.
 func (tx *Tx) StmtContext(ctx context.Context, stmt *Stmt) *Stmt {
-	stmt.stmt = tx.Tx.StmtContext(ctx, stmt.stmt)
-	return stmt
+	stmt2 := new(Stmt)
+	*stmt2 = *stmt
+	stmt2.stmt = tx.Tx.StmtContext(ctx, stmt2.stmt)
+	return stmt2
 }
 
 // Stmt returns a transaction-specific prepared statement from an existing
