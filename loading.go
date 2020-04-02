@@ -94,7 +94,7 @@ func (q *Query) load(v reflect.Value, elemt reflect.Type, loadJustOne, isPtr boo
 		noMatch := true
 		for i, index := range fieldIndexes {
 			if index == nil {
-				fields[i] = &ignoreField
+				fields[i] = new(interface{})
 				continue
 			}
 			noMatch = false
@@ -124,8 +124,6 @@ func (q *Query) load(v reflect.Value, elemt reflect.Type, loadJustOne, isPtr boo
 	}
 	return err
 }
-
-var ignoreField interface{}
 
 // ScanAllRows executes the query that is expected to return rows.
 // It copies the columns from the matched rows into the slices
