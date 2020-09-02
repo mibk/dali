@@ -205,7 +205,12 @@ func (p *Translator) try(err error) error {
 }
 
 func (p *Translator) escapeValue(b *bytes.Buffer, v interface{}) error {
+	vv := reflect.ValueOf(v)
 	if valuer, ok := v.(driver.Valuer); ok {
+		if vv.Kind() == reflect.Ptr && vv.IsNil() {
+			b.WriteString("NULL")
+			return nil
+		}
 		var err error
 		if v, err = valuer.Value(); err != nil {
 			return err
