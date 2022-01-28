@@ -225,6 +225,12 @@ func (p *Translator) escapeValue(b *bytes.Buffer, v interface{}) error {
 	}
 
 	switch vv.Kind() {
+	case reflect.Ptr:
+		if vv.IsNil() {
+			b.WriteString("NULL")
+			return nil
+		}
+		return p.escapeValue(b, vv.Elem().Interface())
 	case reflect.Bool:
 		p.dialect.EscapeBool(b, vv.Bool())
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
