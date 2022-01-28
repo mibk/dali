@@ -306,7 +306,7 @@ func (p *Translator) printValuesClause(b *bytes.Buffer, v interface{}) error {
 	}
 	b.WriteString(") VALUES (")
 	for i, v := range vals {
-		p.escapeValue(b, v)
+		p.try(p.escapeValue(b, v))
 		if i != len(vals)-1 {
 			b.WriteString(", ")
 		}
@@ -325,7 +325,7 @@ func (p *Translator) printSetClause(b *bytes.Buffer, v interface{}) error {
 		v := vals[i]
 		p.dialect.EscapeIdent(b, c)
 		b.WriteString(" = ")
-		p.escapeValue(b, v)
+		p.try(p.escapeValue(b, v))
 		if i != len(vals)-1 {
 			b.WriteString(", ")
 		}
@@ -403,7 +403,7 @@ func (p *Translator) printMultiValuesClause(b *bytes.Buffer, v interface{}) erro
 		}
 		vals := valuesByFieldIndexes(el, indexes)
 		for i, v := range vals {
-			p.escapeValue(b, v)
+			p.try(p.escapeValue(b, v))
 			if i != len(vals)-1 {
 				b.WriteString(", ")
 			}
