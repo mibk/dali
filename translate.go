@@ -145,10 +145,10 @@ func (p *Translator) interpolate(b *bytes.Buffer, typ string, expand bool) error
 				return fmt.Errorf("empty slice passed to ?ident...")
 			}
 			for i, ident := range idents {
-				p.dialect.EscapeIdent(b, ident)
-				if i != len(idents)-1 {
+				if i > 0 {
 					b.WriteString(", ")
 				}
+				p.dialect.EscapeIdent(b, ident)
 			}
 		case "values":
 			p.try(p.checkInterpolationOf("?values..."))
@@ -282,11 +282,11 @@ func (p *Translator) escapeMultipleValues(b *bytes.Buffer, v interface{}) error 
 		return fmt.Errorf("empty slice passed to ?...")
 	}
 	for i := 0; i < length; i++ {
+		if i > 0 {
+			b.WriteString(", ")
+		}
 		if err := p.escapeValue(b, vv.Index(i).Interface()); err != nil {
 			return err
-		}
-		if i != length-1 {
-			b.WriteString(", ")
 		}
 	}
 	return nil
@@ -299,17 +299,17 @@ func (p *Translator) printValuesClause(b *bytes.Buffer, v interface{}) error {
 	}
 	b.WriteRune('(')
 	for i, c := range cols {
-		p.dialect.EscapeIdent(b, c)
-		if i != len(vals)-1 {
+		if i > 0 {
 			b.WriteString(", ")
 		}
+		p.dialect.EscapeIdent(b, c)
 	}
 	b.WriteString(") VALUES (")
 	for i, v := range vals {
-		p.try(p.escapeValue(b, v))
-		if i != len(vals)-1 {
+		if i > 0 {
 			b.WriteString(", ")
 		}
+		p.try(p.escapeValue(b, v))
 	}
 	b.WriteRune(')')
 	return nil
@@ -322,13 +322,13 @@ func (p *Translator) printSetClause(b *bytes.Buffer, v interface{}) error {
 	}
 	b.WriteString("SET ")
 	for i, c := range cols {
+		if i > 0 {
+			b.WriteString(", ")
+		}
 		v := vals[i]
 		p.dialect.EscapeIdent(b, c)
 		b.WriteString(" = ")
 		p.try(p.escapeValue(b, v))
-		if i != len(vals)-1 {
-			b.WriteString(", ")
-		}
 	}
 	return nil
 }
@@ -389,10 +389,10 @@ func (p *Translator) printMultiValuesClause(b *bytes.Buffer, v interface{}) erro
 	}
 	b.WriteRune('(')
 	for i, c := range cols {
-		p.dialect.EscapeIdent(b, c)
-		if i != len(cols)-1 {
+		if i > 0 {
 			b.WriteString(", ")
 		}
+		p.dialect.EscapeIdent(b, c)
 	}
 	b.WriteString(") VALUES")
 	for i, length := 0, vv.Len(); i < length; i++ {
@@ -403,10 +403,10 @@ func (p *Translator) printMultiValuesClause(b *bytes.Buffer, v interface{}) erro
 		}
 		vals := valuesByFieldIndexes(el, indexes)
 		for i, v := range vals {
-			p.try(p.escapeValue(b, v))
-			if i != len(vals)-1 {
+			if i > 0 {
 				b.WriteString(", ")
 			}
+			p.try(p.escapeValue(b, v))
 		}
 		b.WriteRune(')')
 		if i != length-1 {
