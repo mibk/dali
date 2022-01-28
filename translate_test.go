@@ -10,6 +10,8 @@ import (
 	"time"
 )
 
+type MyString string
+
 var placeholderTests = []struct {
 	sql    string
 	args   []interface{}
@@ -44,6 +46,9 @@ var placeholderTests = []struct {
 		"INSERT ({V_name}) VALUES ('Syd')"},
 	{"INSERT ?values", Args{Map{"rank": "Colonel", "id": 3, "name": "Frank"}},
 		"INSERT ({id}, {name}, {rank}) VALUES (3, 'Frank', 'Colonel')"},
+
+	{"SELECT ?", Args{MyString("ahoj")},
+		"SELECT 'ahoj'"},
 
 	// embedded structs
 	{"INSERT ?values", Args{E{1, Name{"John", "Doe"}}},

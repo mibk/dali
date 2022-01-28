@@ -204,6 +204,8 @@ func (p *Translator) try(err error) error {
 	return p.err
 }
 
+var timeType = reflect.TypeOf(time.Time{})
+
 func (p *Translator) escapeValue(b *bytes.Buffer, v interface{}) error {
 	vv := reflect.ValueOf(v)
 	if valuer, ok := v.(driver.Valuer); ok {
@@ -215,53 +217,36 @@ func (p *Translator) escapeValue(b *bytes.Buffer, v interface{}) error {
 		if v, err = valuer.Value(); err != nil {
 			return err
 		}
+		vv = reflect.ValueOf(v)
 	}
 	if v == nil {
 		b.WriteString("NULL")
 		return nil
 	}
-	switch v := v.(type) {
-	case bool:
-		p.dialect.EscapeBool(b, v)
 
-	// signed integers
-	case int:
-		formatInt(b, int64(v))
-	case int8:
-		formatInt(b, int64(v))
-	case int16:
-		formatInt(b, int64(v))
-	case int32:
-		formatInt(b, int64(v))
-	case int64:
-		formatInt(b, v)
-
-	// unsigned integers
-	case uint:
-		formatUint(b, uint64(v))
-	case uint8:
-		formatUint(b, uint64(v))
-	case uint16:
-		formatUint(b, uint64(v))
-	case uint32:
-		formatUint(b, uint64(v))
-	case uint64:
-		formatUint(b, v)
-
-	// floats
-	case float32:
-		formatFloat(b, float64(v))
-	case float64:
-		formatFloat(b, v)
-
-	case string:
-		p.dialect.EscapeString(b, v)
-
-	case []byte:
-		p.dialect.EscapeBytes(b, v)
-
-	case time.Time:
-		p.dialect.EscapeTime(b, v)
+	switch vv.Kind() {
+	case reflect.Bool:
+		p.dialect.EscapeBool(b, vv.Bool())
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		formatInt(b, vv.Int())
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
+		formatUint(b, vv.Uint())
+	case reflect.Float32, reflect.Float64:
+		formatFloat(b, vv.Float())
+	case reflect.String:
+		p.dialect.EscapeString(b, vv.String())
+	case reflect.Slice:
+		if vv.Type().Elem().Kind() == reflect.Uint8 {
+			p.dialect.EscapeBytes(b, vv.Bytes())
+			break
+		}
+		return fmt.Errorf("only a slice of bytes supported; got: %T", v)
+	case reflect.Struct:
+		if vv.Type() == timeType {
+			p.dialect.EscapeTime(b, vv.Interface().(time.Time))
+			break
+		}
+		fallthrough
 	default:
 		return fmt.Errorf("invalid argument type: %T", v)
 	}
