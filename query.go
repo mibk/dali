@@ -49,7 +49,7 @@ func (q *Query) String() string {
 	if q.err != nil {
 		panic(q.err)
 	}
-	if q.args != nil {
+	if len(q.args) > 0 {
 		return fmt.Sprintf("%s /* args: %v */", q.query, q.args)
 	}
 	return q.query

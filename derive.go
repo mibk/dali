@@ -13,10 +13,10 @@ import (
 // If the tag name equals "-", the field is ignored. If insert is true,
 // fields having the selectonly property are ignored as well.
 func colNamesAndFieldIndexes(typ reflect.Type, insert bool) (cols []string, indexes [][]int) {
-	return colNamesAndFieldIndexesOfEmbedded(typ, []int{}, insert)
+	return colNamesAndFieldIndexesBase(nil, typ, insert)
 }
 
-func colNamesAndFieldIndexesOfEmbedded(typ reflect.Type, index []int, insert bool) (cols []string, indexes [][]int) {
+func colNamesAndFieldIndexesBase(baseIndex []int, typ reflect.Type, insert bool) (cols []string, indexes [][]int) {
 	for i := 0; i < typ.NumField(); i++ {
 		f := typ.Field(i)
 		if f.PkgPath != "" { // Is unexported?
@@ -25,29 +25,26 @@ func colNamesAndFieldIndexesOfEmbedded(typ reflect.Type, index []int, insert boo
 		if f.Type.Kind() == reflect.Struct {
 			switch {
 			case f.Type.ConvertibleTo(reflect.TypeOf(time.Time{})):
-				break
 			case insert && f.Type.Implements(valuerInterface):
-				break
 			case !insert && (f.Type.Implements(scannerInterface) ||
 				reflect.PtrTo(f.Type).Implements(scannerInterface)):
-				break
 			default:
-				emCols, emIndexes := colNamesAndFieldIndexesOfEmbedded(f.Type,
-					append(index, i), insert)
+				emCols, emIndexes := colNamesAndFieldIndexesBase(append(baseIndex, i), f.Type, insert)
 				cols = append(cols, emCols...)
 				indexes = append(indexes, emIndexes...)
 				continue
 			}
 		}
+
 		prop := parseFieldProp(f.Tag.Get("db"))
 		if prop.Ignore || insert && prop.SelectOnly {
 			continue
 		}
-		if prop.Col == "" {
-			prop.Col = f.Name
+		if prop.ColName == "" {
+			prop.ColName = f.Name
 		}
-		cols = append(cols, prop.Col)
-		indexes = append(indexes, append(index, i))
+		cols = append(cols, prop.ColName)
+		indexes = append(indexes, append(baseIndex, i))
 	}
 	return
 }
@@ -57,18 +54,18 @@ var (
 	scannerInterface = reflect.TypeOf((*sql.Scanner)(nil)).Elem()
 )
 
-type fieldProp struct {
-	Col        string
+type fieldProps struct {
+	ColName    string
 	SelectOnly bool
 	Ignore     bool
 }
 
-func parseFieldProp(s string) fieldProp {
+func parseFieldProp(s string) fieldProps {
 	props := strings.Split(s, ",")
 	if props[0] == "-" {
-		return fieldProp{Ignore: true}
+		return fieldProps{Ignore: true}
 	}
-	p := fieldProp{Col: props[0]}
+	p := fieldProps{ColName: props[0]}
 	for _, prop := range props[1:] {
 		switch prop {
 		case "selectonly":

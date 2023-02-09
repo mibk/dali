@@ -111,9 +111,10 @@ func (q *Query) load(v reflect.Value, elemt reflect.Type, loadJustOne, isPtr boo
 			v.Set(elemv)
 			err = nil
 			break
+		}
 
-			// Otherwise, v must be a slice.
-		} else if isPtr {
+		// Otherwise, v must be a slice.
+		if isPtr {
 			v.Set(reflect.Append(v, elemvptr))
 		} else {
 			v.Set(reflect.Append(v, elemv))
