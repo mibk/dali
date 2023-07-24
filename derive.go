@@ -19,21 +19,24 @@ func colNamesAndFieldIndexes(typ reflect.Type, insert bool) (cols []string, inde
 func colNamesAndFieldIndexesBase(baseIndex []int, typ reflect.Type, insert bool) (cols []string, indexes [][]int) {
 	for i := 0; i < typ.NumField(); i++ {
 		f := typ.Field(i)
-		if f.PkgPath != "" { // Is unexported?
-			continue
-		}
+
 		if f.Type.Kind() == reflect.Struct {
 			switch {
 			case f.Type == reflect.TypeOf(time.Time{}):
 			case insert && f.Type.Implements(valuerInterface):
-			case !insert && (f.Type.Implements(scannerInterface) ||
-				reflect.PtrTo(f.Type).Implements(scannerInterface)):
-			default:
+			case !insert && (f.Type.Implements(scannerInterface) || reflect.PtrTo(f.Type).Implements(scannerInterface)):
+				// Known struct.
+
+			case f.Anonymous, f.IsExported():
 				emCols, emIndexes := colNamesAndFieldIndexesBase(append(baseIndex, i), f.Type, insert)
 				cols = append(cols, emCols...)
 				indexes = append(indexes, emIndexes...)
 				continue
 			}
+		}
+
+		if !f.IsExported() {
+			continue
 		}
 
 		prop := parseFieldProp(f.Tag.Get("db"))

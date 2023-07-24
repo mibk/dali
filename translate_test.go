@@ -57,6 +57,8 @@ var placeholderTests = []struct {
 	// embedded structs
 	{"INSERT ?values", Args{E{1, Name{"John", "Doe"}}},
 		"INSERT ({ID}, {First}, {Last}) VALUES (1, 'John', 'Doe')"},
+	{"INSERT ?values", Args{Person{1, personProps{"John Doe"}}},
+		"INSERT ({ID}, {Name}) VALUES (1, 'John Doe')"},
 
 	// ignored embedded structs
 	{"?values", Args{SpecialStruct{"Waking up", parseTime("2015-04-05 06:07:08"), sql.NullString{}}},
@@ -183,6 +185,14 @@ func (wh *Where) And(sql string, args ...interface{}) *Where {
 func (wh *Where) MarshalSQL(t Translator) (string, error) {
 	sql := "(" + strings.Join(wh.conds, ") AND (") + ")"
 	return t.Translate(sql, wh.args)
+}
+
+type personProps struct {
+	Name string
+}
+type Person struct {
+	ID int
+	personProps
 }
 
 var errorTests = []struct {
