@@ -270,7 +270,8 @@ func (p *Translator) escapeMultipleValues(b *bytes.Buffer, v interface{}) error 
 	}
 	length := vv.Len()
 	if length == 0 {
-		return fmt.Errorf("empty slice passed to ?...")
+		b.WriteString("NULL")
+		return nil
 	}
 	for i := 0; i < length; i++ {
 		if i > 0 {

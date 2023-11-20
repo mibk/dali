@@ -82,6 +82,8 @@ var placeholderTests = []struct {
 	{"SELECT ?sql", Args{"* FROM user"}, "SELECT * FROM user"},
 	{"SELECT WHERE ?sql", Args{new(Where).And("name = ?", "Josef").And("age > ?", 30)},
 		"SELECT WHERE (name = 'Josef') AND (age > 30)"},
+
+	{"SELECT * WHERE x IN (?...)", Args{[]string{}}, "SELECT * WHERE x IN (NULL)"},
 }
 
 func TestPlaceholders(t *testing.T) {
@@ -213,7 +215,6 @@ var errorTests = []struct {
 		"dali: ?values... expects the argument to be a slice of structs"},
 
 	// empty slice
-	{"INSERT ?...", Args{[]string{}}, "dali: empty slice passed to ?..."},
 	{"SELECT ?ident...", Args{[]int{}}, "dali: ?ident... expects the argument to be a []string"},
 	{"SELECT ?ident...", Args{[]string{}}, "dali: empty slice passed to ?ident..."},
 	{"INSERT ?values...", Args{[]string{}},
