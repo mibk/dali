@@ -55,7 +55,13 @@ func (q *Query) All(dest interface{}) error {
 func (q *Query) loadStruct(v reflect.Value) error { return q.load(v, v.Type(), true, false) }
 
 func (q *Query) loadStructs(slicev reflect.Value, elemt reflect.Type, isPtr bool) error {
-	return q.load(slicev, elemt, false, isPtr)
+	err := q.load(slicev, elemt, false, isPtr)
+	if err == sql.ErrNoRows {
+		slicev.SetLen(0)
+		slicev.SetCap(0)
+		return nil
+	}
+	return err
 }
 
 func (q *Query) load(v reflect.Value, elemt reflect.Type, loadJustOne, isPtr bool) error {
@@ -83,11 +89,9 @@ func (q *Query) load(v reflect.Value, elemt reflect.Type, loadJustOne, isPtr boo
 	}
 	fields := make([]interface{}, len(fieldIndexes))
 
-	err = nil
-	if loadJustOne {
-		err = sql.ErrNoRows
-	}
+	noRows := true
 	for rows.Next() {
+		noRows = false
 		elemvptr := reflect.New(elemt)
 		elemv := reflect.Indirect(elemvptr)
 
@@ -109,7 +113,6 @@ func (q *Query) load(v reflect.Value, elemt reflect.Type, loadJustOne, isPtr boo
 		if loadJustOne {
 			// v is a struct.
 			v.Set(elemv)
-			err = nil
 			break
 		}
 
@@ -123,7 +126,10 @@ func (q *Query) load(v reflect.Value, elemt reflect.Type, loadJustOne, isPtr boo
 	if err := rows.Err(); err != nil {
 		return err
 	}
-	return err
+	if noRows {
+		return sql.ErrNoRows
+	}
+	return nil
 }
 
 // ScanAllRows executes the query that is expected to return rows.
@@ -150,7 +156,9 @@ func (q *Query) ScanAllRows(dests ...interface{}) error {
 	defer rows.Close()
 	elemvptrs := make([]reflect.Value, len(dests))
 	args := make([]interface{}, len(dests))
+	noRows := true
 	for rows.Next() {
+		noRows = false
 		for i := range args {
 			elemvptrs[i] = reflect.New(elemtypes[i])
 			args[i] = elemvptrs[i].Interface()
@@ -162,5 +170,14 @@ func (q *Query) ScanAllRows(dests ...interface{}) error {
 			slicevals[i].Set(reflect.Append(slicevals[i], reflect.Indirect(elemvptrs[i])))
 		}
 	}
-	return rows.Err()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	if noRows {
+		for _, slicev := range slicevals {
+			slicev.SetLen(0)
+			slicev.SetCap(0)
+		}
+	}
+	return nil
 }

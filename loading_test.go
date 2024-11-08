@@ -129,6 +129,40 @@ func Test_One_and_All(t *testing.T) {
 	}
 }
 
+func TestNoRows(t *testing.T) {
+	dvr.SetColumns("ID", "Name").SetResult()
+
+	var rows = []struct{}{{}, {}}
+	if err := db.Query("").All(&rows); err != nil {
+		t.Errorf("unexpected err: %v", err)
+	}
+	if len(rows) != 0 {
+		t.Errorf("len(rows) must be 0, got %d", len(rows))
+	}
+	if cap(rows) != 0 {
+		t.Errorf("cap(rows) must be 0, got %d", cap(rows))
+	}
+
+	var vals = []struct{}{{}, {}}
+	vals2 := vals
+	if err := db.Query("").ScanAllRows(&vals, &vals2); err != nil {
+		t.Errorf("unexpected err: %v", err)
+	}
+	if len(vals) != 0 {
+		t.Errorf("len(vals) must be 0, got %d", len(vals))
+	}
+	if cap(vals) != 0 {
+		t.Errorf("cap(vals) must be 0, got %d", cap(vals))
+	}
+
+	if len(vals2) != 0 {
+		t.Errorf("len(vals2) must be 0, got %d", len(vals2))
+	}
+	if cap(vals2) != 0 {
+		t.Errorf("cap(vals2) must be 0, got %d", cap(vals2))
+	}
+}
+
 type U struct {
 	ID   int64
 	Name string
