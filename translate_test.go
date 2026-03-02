@@ -415,7 +415,7 @@ func TestPreparedStmts(t *testing.T) {
 		if gotErr != tt.wantErr {
 			var wantErr error
 			if tt.wantErr != "" {
-				wantErr = fmt.Errorf(tt.wantErr)
+				wantErr = fmt.Errorf("%s", tt.wantErr)
 			}
 			t.Errorf("%s:\ngot err: %v\n   want: %v", tt.sql, err, wantErr)
 		}
