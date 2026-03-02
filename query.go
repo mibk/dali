@@ -47,7 +47,7 @@ func (q *Query) ScanRow(dest ...any) error {
 
 func (q *Query) String() string {
 	if q.err != nil {
-		panic(q.err)
+		return fmt.Sprintf("error: %v", q.err)
 	}
 	if len(q.args) > 0 {
 		return fmt.Sprintf("%s /* args: %v */", q.query, q.args)
