@@ -338,6 +338,8 @@ func (t *Translator) deriveColsAndVals(v any) (cols []string, vals []any, err er
 			keys = append(keys, k)
 		}
 		sort.Strings(keys)
+		cols = make([]string, 0, len(keys))
+		vals = make([]any, 0, len(keys))
 		for _, col := range keys {
 			cols = append(cols, col)
 			vals = append(vals, v[col])
@@ -415,7 +417,8 @@ func errNoCols(v any) error {
 	return fmt.Errorf("no columns derived from %T", v)
 }
 
-func valuesByFieldIndexes(v reflect.Value, indexes [][]int) (vals []any) {
+func valuesByFieldIndexes(v reflect.Value, indexes [][]int) []any {
+	vals := make([]any, 0, len(indexes))
 	for _, index := range indexes {
 		vals = append(vals, v.FieldByIndex(index).Interface())
 	}
