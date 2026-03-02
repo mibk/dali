@@ -64,6 +64,7 @@ func TestScanAllRows(t *testing.T) {
 
 func Test_One_and_All(t *testing.T) {
 	tests := []struct {
+		name     string
 		cols     []string
 		result   []any
 		v        any // value to load
@@ -71,38 +72,37 @@ func Test_One_and_All(t *testing.T) {
 		expected any
 	}{
 		{
+			"All/[]U",
 			cols("ID", "Name"), result(U{2, "Caroline"}, U{3, "Mark"}, U{4, "Lucas"}),
 			newTypeOf([]U{}), (*Query).All,
 			[]U{{2, "Caroline"}, {3, "Mark"}, {4, "Lucas"}},
 		},
 		{
+			"All/[]*U",
 			cols("ID", "Name"), result(U{1, "Alice"}, U{2, "Bob"}, U{13, "Carmen"}),
 			newTypeOf([]*U{}), (*Query).All,
 			[]*U{{1, "Alice"}, {2, "Bob"}, {13, "Carmen"}},
 		},
-
-		// column names from field tags
 		{
+			"All/field_tags",
 			cols("ID", "V_name"), result(Vres{1, "Justin"}, Vres{2, "Martin"}, Vres{13, "Lis"}),
 			newTypeOf([]V{}), (*Query).All,
 			[]V{{0, "Justin"}, {0, "Martin"}, {0, "Lis"}},
 		},
-
 		{
+			"One/U",
 			cols("ID", "Name"), result(U{1, "Thomas"}, U{2, "Bob"}, U{13, "Carmen"}),
 			newTypeOf(U{}), (*Query).One,
 			U{1, "Thomas"},
 		},
-
-		// embedded structs
 		{
+			"All/embedded_structs",
 			cols("ID", "First", "Last"), result(Eres{1, "Thomas", "Shoe"}, Eres{4, "Bob", "Webber"}),
 			newTypeOf([]E{}), (*Query).All,
 			[]E{{1, Name{"Thomas", "Shoe"}}, {4, Name{"Bob", "Webber"}}},
 		},
-
-		// ignored embedded structs
 		{
+			"One/ignored_embedded_null",
 			cols("Event", "Started", "Finished"), result(SpecialStructRes{
 				"Lunch",
 				parseTime("2015-05-05 12:24:32"), nil,
@@ -111,6 +111,7 @@ func Test_One_and_All(t *testing.T) {
 			SpecialStruct{"Lunch", parseTime("2015-05-05 12:24:32"), sql.NullString{}},
 		},
 		{
+			"One/ignored_embedded_valid",
 			cols("Event", "Started", "Finished"), result(SpecialStructRes{
 				"Lunch",
 				parseTime("2015-05-05 12:24:32"), "2015-05-05 13:08:17",
@@ -121,21 +122,20 @@ func Test_One_and_All(t *testing.T) {
 				sql.NullString{String: "2015-05-05 13:08:17", Valid: true},
 			},
 		},
-
-		// ignore scanner but not valuer
 		{
+			"One/scanner_not_valuer",
 			cols("A", "B", "Scan"), result(VSres{2, 3, "group:name"}),
 			newTypeOf(VS{}), (*Query).One,
 			VS{Val{2, 3}, Scan{"group", "name"}},
 		},
-
-		// ,selectonly
 		{
+			"All/selectonly",
 			cols("ID", "Name", "Age"), result(Omit{1, "Barbora", 19}, Omit{4, "Bob", 23}),
 			newTypeOf([]Omit{}), (*Query).All,
 			[]Omit{{1, "Barbora", 19}, {4, "Bob", 23}},
 		},
 		{
+			"All/selectonly_custom_col",
 			cols("Id_user", "Name", "Age"), result(Omit2res{1, "Hubert", 32}, Omit2res{4, "Bob", 23}),
 			newTypeOf([]Omit2{}), (*Query).All,
 			[]Omit2{{1, "Hubert", 32}, {4, "Bob", 23}},
@@ -143,15 +143,17 @@ func Test_One_and_All(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		dvr.SetColumns(tt.cols...).SetResult(tt.result...)
-		if err := tt.method(db.Query(""), tt.v); err != nil {
-			t.Fatal(err)
-		}
-		vv := reflect.ValueOf(tt.v)
-		v := reflect.Indirect(vv).Interface()
-		if !reflect.DeepEqual(v, tt.expected) {
-			t.Errorf("loading:\n got: %v\nwant: %v", v, tt.expected)
-		}
+		t.Run(tt.name, func(t *testing.T) {
+			dvr.SetColumns(tt.cols...).SetResult(tt.result...)
+			if err := tt.method(db.Query(""), tt.v); err != nil {
+				t.Fatal(err)
+			}
+			vv := reflect.ValueOf(tt.v)
+			v := reflect.Indirect(vv).Interface()
+			if !reflect.DeepEqual(v, tt.expected) {
+				t.Errorf("\n got: %v\nwant: %v", v, tt.expected)
+			}
+		})
 	}
 }
 
@@ -230,36 +232,41 @@ type VSres struct {
 
 func TestLoading_Types(t *testing.T) {
 	tests := []struct {
+		name     string
 		result   []any
 		v        any // value to load
 		expected any
 	}{
-		{result(struct{ A int64 }{-27}), newTypeOf(int64(0)), int64(-27)},
-		{result(struct{ A float64 }{-2.71828}), newTypeOf(float64(0)), float64(-2.71828)},
-		{result(struct{ A bool }{true}), newTypeOf(false), true},
-		{result(struct{ A bool }{false}), newTypeOf(false), false},
-		{result(struct{ A string }{"Carl"}), newTypeOf(""), "Carl"},
+		{"int64", result(struct{ A int64 }{-27}), newTypeOf(int64(0)), int64(-27)},
+		{"float64", result(struct{ A float64 }{-2.71828}), newTypeOf(float64(0)), float64(-2.71828)},
+		{"bool/true", result(struct{ A bool }{true}), newTypeOf(false), true},
+		{"bool/false", result(struct{ A bool }{false}), newTypeOf(false), false},
+		{"string", result(struct{ A string }{"Carl"}), newTypeOf(""), "Carl"},
 		{
+			"NullString/valid",
 			result(struct{ A string }{"Lucas"}), newTypeOf(sql.NullString{}),
 			sql.NullString{String: "Lucas", Valid: true},
 		},
 		{
+			"NullString/null",
 			result(struct{ A any }{nil}), newTypeOf(sql.NullString{}),
 			sql.NullString{},
 		},
 	}
 
 	for _, tt := range tests {
-		dvr.SetColumns("A").SetResult(tt.result...)
-		if err := db.Query("").ScanRow(tt.v); err != nil {
-			t.Fatal(err)
-		}
-		vv := reflect.ValueOf(tt.v)
-		v := reflect.Indirect(vv).Interface()
-		if !reflect.DeepEqual(v, tt.expected) {
-			t.Errorf("loading:\n got: %v (%T)\nwant: %v (%T)", v, v, tt.expected,
-				tt.expected)
-		}
+		t.Run(tt.name, func(t *testing.T) {
+			dvr.SetColumns("A").SetResult(tt.result...)
+			if err := db.Query("").ScanRow(tt.v); err != nil {
+				t.Fatal(err)
+			}
+			vv := reflect.ValueOf(tt.v)
+			v := reflect.Indirect(vv).Interface()
+			if !reflect.DeepEqual(v, tt.expected) {
+				t.Errorf("\n got: %v (%T)\nwant: %v (%T)", v, v, tt.expected,
+					tt.expected)
+			}
+		})
 	}
 }
 
@@ -273,6 +280,7 @@ func TestErrNoRows(t *testing.T) {
 
 func TestEmptyColumns(t *testing.T) {
 	tests := []struct {
+		name   string
 		cols   []string
 		result []any
 		v      any // value to load
@@ -280,25 +288,30 @@ func TestEmptyColumns(t *testing.T) {
 		expErr string
 	}{
 		{
+			"One",
 			cols("ID", "Name"), result(U{2, "Caroline"}, U{3, "Mark"}, U{4, "Lucas"}),
 			newTypeOf(V{}), (*Query).One,
 			"dali: no match between columns and struct fields",
-		}, // #1
+		},
 		{
+			"All",
 			cols("ID", "Name"), result(U{2, "Caroline"}, U{3, "Mark"}, U{4, "Lucas"}),
 			newTypeOf([]V{}), (*Query).All,
 			"dali: no match between columns and struct fields",
 		},
 	}
 
-	for i, tt := range tests {
-		dvr.SetColumns(tt.cols...).SetResult(tt.result...)
-		err := tt.method(db.Query(""), tt.v)
-		if err == nil {
-			t.Errorf("#%d: error was expected but none given", i+1)
-		} else if err.Error() != tt.expErr {
-			t.Errorf("#%d\n got: %v\nwant: %v", i+1, err, tt.expErr)
-		}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dvr.SetColumns(tt.cols...).SetResult(tt.result...)
+			err := tt.method(db.Query(""), tt.v)
+			if err == nil {
+				t.Fatal("error was expected but none given")
+			}
+			if err.Error() != tt.expErr {
+				t.Errorf("\n got: %v\nwant: %v", err, tt.expErr)
+			}
+		})
 	}
 }
 

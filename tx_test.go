@@ -18,26 +18,28 @@ func TestTransactions(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, tt := range transactionTests {
-		var q *Query
-		var gotErr error
-		if tt.prepared {
-			stmt, err := tx.Prepare(tt.sql, tt.args...)
-			if err != nil {
-				gotErr = err
+		t.Run(tt.sql, func(t *testing.T) {
+			var q *Query
+			var gotErr error
+			if tt.prepared {
+				stmt, err := tx.Prepare(tt.sql, tt.args...)
+				if err != nil {
+					gotErr = err
+				} else {
+					q = stmt.Bind()
+				}
 			} else {
-				q = stmt.Bind()
+				q = tx.Query(tt.sql, tt.args...)
+				if q.err != nil {
+					gotErr = q.err
+				}
 			}
-		} else {
-			q = tx.Query(tt.sql, tt.args...)
-			if q.err != nil {
-				gotErr = q.err
+			if gotErr != nil {
+				t.Fatalf("unexpected err: %v", gotErr)
 			}
-		}
-		if gotErr != nil {
-			t.Fatalf("%s:\nunexpected err: %v\n", tt.sql, gotErr)
-		}
-		if q.query != tt.wantSQL {
-			t.Errorf("\n got: %v\nwant: %v", q.query, tt.wantSQL)
-		}
+			if q.query != tt.wantSQL {
+				t.Errorf("\n got: %v\nwant: %v", q.query, tt.wantSQL)
+			}
+		})
 	}
 }
