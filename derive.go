@@ -24,7 +24,7 @@ func colNamesAndFieldIndexesBase(baseIndex []int, typ reflect.Type, insert bool)
 			switch {
 			case f.Type == reflect.TypeFor[time.Time]():
 			case insert && f.Type.Implements(valuerInterface):
-			case !insert && (f.Type.Implements(scannerInterface) || reflect.PtrTo(f.Type).Implements(scannerInterface)):
+			case !insert && (f.Type.Implements(scannerInterface) || reflect.PointerTo(f.Type).Implements(scannerInterface)):
 				// Known struct.
 
 			case f.Anonymous, f.IsExported():

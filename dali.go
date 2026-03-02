@@ -81,9 +81,9 @@ func (db *DB) Query(query string, args ...any) *Query {
 // is no longer needed. Unlike the Prepare methods in database/sql this
 // method also accepts args, which are meant only for query building.
 // Therefore, only ?ident, ?ident..., ?sql are interpolated in this phase.
-// Apart of that, ? is the only other placeholder allowed (this one
+// Apart from that, ? is the only other placeholder allowed (this one
 // will be transformed into a dialect specific one to allow the parameter
-// binding.
+// binding).
 //
 // The provided context is used for the preparation of the statement, not
 // for the execution of the statement.
@@ -104,9 +104,9 @@ func (db *DB) PrepareContext(ctx context.Context, query string, args ...any) (*S
 // is no longer needed. Unlike the Prepare methods in database/sql this
 // method also accepts args, which are meant only for query building.
 // Therefore, only ?ident, ?ident..., ?sql are interpolated in this phase.
-// Apart of that, ? is the only other placeholder allowed (this one
+// Apart from that, ? is the only other placeholder allowed (this one
 // will be transformed into a dialect specific one to allow the parameter
-// binding.
+// binding).
 func (db *DB) Prepare(query string, args ...any) (*Stmt, error) {
 	return db.PrepareContext(context.Background(), query, args...)
 }
@@ -140,8 +140,8 @@ func (db *DB) Begin() (*Tx, error) {
 }
 
 // SetMiddlewareFunc changes the DB middleware func. Default func
-// passes the Execer unchanged. SetMiddlewareFunc allowes the user
-// to set his own middleware to perform additional operations (e.g.
+// passes the Execer unchanged. SetMiddlewareFunc allows the user
+// to set a custom middleware to perform additional operations (e.g.
 // profiling) when executing queries.
 func (db *DB) SetMiddlewareFunc(f func(Execer) Execer) {
 	db.middleware = f

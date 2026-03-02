@@ -4,7 +4,7 @@
 
 # Database Abstraction Layer (í)
 
-DALí is not exactly a database abstration layer. It doesn't try to abstract the SQL in a way
+DALí is not exactly a database abstraction layer. It doesn't try to abstract the SQL in a way
 that the queries could run unchanged on any supported database. It rather abstracts
 just the placeholder manipulation and provides convenient ways for some common situations.
 
@@ -84,7 +84,7 @@ type User struct {
 }
 ```
 
-## Instalation
+## Installation
 
 ```bash
 $ go get github.com/mibk/dali

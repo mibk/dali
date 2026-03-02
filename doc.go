@@ -1,7 +1,7 @@
 // Package dali wraps the sql.DB and provides convenient API for building
 // database driven applications. Its main goal is to create a unified way
 // of handling placeholders among all drivers and to simplify some common,
-// repetive queries.
+// repetitive queries.
 //
 // There is no support for query builders (you have to write pure SQL queries).
 // It focuses on the common queries (like writing INSERTs or UPDATEs) and on
@@ -29,11 +29,11 @@
 //
 // dali has also a support for prepared statements. However, it doesn't support certain
 // placeholders. Only ?ident, ?ident..., and ?sql placeholders are allowed in the phase
-// of the query building (befored the statement is prepared). The ? placeholder is the
+// of the query building (before the statement is prepared). The ? placeholder is the
 // only one left for parameter binding. So working with prepared statements can look
 // like this:
 //
-//	cols := []strings{"name", "group_id"}
+//	cols := []string{"name", "group_id"}
 //	var (
 //		name    string
 //		groupID int64

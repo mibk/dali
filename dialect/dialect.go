@@ -7,7 +7,7 @@ import (
 
 // Dialect is the interface that describes a dialect of a particular SQL driver.
 type Dialect interface {
-	// EscapeIdent safely escapes identificatiors (such as column or table
+	// EscapeIdent safely escapes identifiers (such as column or table
 	// names, etc.)
 	EscapeIdent(w io.Writer, ident string)
 
@@ -27,7 +27,7 @@ type Dialect interface {
 	PrintPlaceholderSign(w io.Writer, n int)
 }
 
-// writeByte is a helper func for Dialect implementators.
+// writeByte is a helper func for Dialect implementors.
 func writeByte(w io.Writer, b byte) (n int, err error) {
 	return w.Write([]byte{b})
 }

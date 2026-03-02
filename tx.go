@@ -8,7 +8,7 @@ import (
 )
 
 // Tx wraps the sql.Tx to provide the Query method instead
-// of the sql.Tx's original methods for comunication with
+// of the sql.Tx's original methods for communication with
 // the database.
 type Tx struct {
 	Tx         *sql.Tx
@@ -37,9 +37,9 @@ func (tx *Tx) Query(query string, args ...any) *Query {
 // is no longer needed. Unlike the Prepare methods in database/sql this
 // method also accepts args, which are meant only for query building.
 // Therefore, only ?ident, ?ident..., ?sql are interpolated in this phase.
-// Apart of that, ? is the only other placeholder allowed (this one
+// Apart from that, ? is the only other placeholder allowed (this one
 // will be transformed into a dialect specific one to allow the parameter
-// binding.
+// binding).
 //
 // The provided context is used for the preparation of the statement, not
 // for the execution of the statement.
@@ -60,9 +60,9 @@ func (tx *Tx) PrepareContext(ctx context.Context, query string, args ...any) (*S
 // is no longer needed. Unlike the Prepare methods in database/sql this
 // method also accepts args, which are meant only for query building.
 // Therefore, only ?ident, ?ident..., ?sql are interpolated in this phase.
-// Apart of that, ? is the only other placeholder allowed (this one
+// Apart from that, ? is the only other placeholder allowed (this one
 // will be transformed into a dialect specific one to allow the parameter
-// binding.
+// binding).
 func (tx *Tx) Prepare(query string, args ...any) (*Stmt, error) {
 	return tx.PrepareContext(context.Background(), query, args...)
 }
