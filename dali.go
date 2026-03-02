@@ -3,6 +3,7 @@ package dali
 import (
 	"context"
 	"database/sql"
+	"fmt"
 
 	"github.com/mibk/dali/dialect"
 )
@@ -29,14 +30,14 @@ func NewDB(db *sql.DB, d dialect.Dialect) *DB {
 
 // Open opens a database by calling sql.Open. It returns a new DB and
 // selects the appropriate dialect which is inferred from the driverName.
-// It panics if the dialect is not supported by dali itself.
+// It returns an error if the dialect is not supported by dali itself.
 func Open(driverName, dataSourceName string) (*DB, error) {
 	var d dialect.Dialect
 	switch driverName {
 	case "mysql":
 		d = dialect.MySQL
 	default:
-		panic("dali: unsupported dialect")
+		return nil, fmt.Errorf("dali: unsupported dialect %q", driverName)
 	}
 	db, err := sql.Open(driverName, dataSourceName)
 	if err != nil {
