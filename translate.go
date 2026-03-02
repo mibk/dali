@@ -50,6 +50,8 @@ func translatePreparedStmt(d dialect.Dialect, sql string, args []any) (string, e
 
 // Translate processes sql and args using the dialect specified in t.
 // It returns the resulting SQL query and an error, if there is one.
+// The value receiver is intentional: each call operates on its own
+// copy so that a single Translator can be reused concurrently.
 func (t Translator) Translate(sql string, args []any) (string, error) {
 	t.args = args
 	s, err := t.translate(sql)
