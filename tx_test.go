@@ -8,7 +8,6 @@ var transactionTests = []struct {
 	wantSQL  string
 	prepared bool
 }{
-
 	{"SELECT name WHERE id = ?", Args{13}, "SELECT name WHERE id = 13", false},
 	{"SELECT ?ident WHERE [id] = ?", Args{"name"}, "SELECT {name} WHERE {id} = &1", true},
 }

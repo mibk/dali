@@ -49,7 +49,7 @@ func colNamesAndFieldIndexesBase(baseIndex []int, typ reflect.Type, insert bool)
 		cols = append(cols, prop.ColName)
 		indexes = append(indexes, append(baseIndex, i))
 	}
-	return
+	return cols, indexes
 }
 
 var (

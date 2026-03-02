@@ -21,67 +21,123 @@ var placeholderTests = []struct {
 	args   []interface{}
 	expSQL string
 }{
-	{"SELECT * FROM [x] WHERE a = ? AND b = ?", Args{3, "four"},
-		"SELECT * FROM {x} WHERE a = 3 AND b = 'four'"},
+	{
+		"SELECT * FROM [x] WHERE a = ? AND b = ?",
+		Args{3, "four"},
+		"SELECT * FROM {x} WHERE a = 3 AND b = 'four'",
+	},
 
 	{"SELECT ?ident.id", Args{"my_table"}, "SELECT {my_table}.id"},
-	{"SELECT ?ident...", Args{[]string{"col1", "col2", "another"}},
-		"SELECT {col1}, {col2}, {another}"},
+	{
+		"SELECT ?ident...",
+		Args{[]string{"col1", "col2", "another"}},
+		"SELECT {col1}, {col2}, {another}",
+	},
 
-	{"INSERT INTO [user] ?values", Args{User{1, "Salvador", 0}},
-		"INSERT INTO {user} ({id}, {user_name}) VALUES (1, 'Salvador')"},
-	{"INSERT INTO [user] ?values...", Args{[]User{
-		{1, "Salvador", 0},
-		{2, "John", 1},
-	}},
+	{
+		"INSERT INTO [user] ?values",
+		Args{User{1, "Salvador", 0}},
+		"INSERT INTO {user} ({id}, {user_name}) VALUES (1, 'Salvador')",
+	},
+	{
+		"INSERT INTO [user] ?values...",
+		Args{[]User{
+			{1, "Salvador", 0},
+			{2, "John", 1},
+		}},
 		"INSERT INTO {user} ({id}, {user_name}) VALUES (1, 'Salvador'), " +
-			"(2, 'John')"},
-	{"UPDATE [user] ?set WHERE [id] = ?", Args{User{10, "Selma", 0}, 1},
-		"UPDATE {user} SET {id} = 10, {user_name} = 'Selma' WHERE {id} = 1"},
+			"(2, 'John')",
+	},
+	{
+		"UPDATE [user] ?set WHERE [id] = ?",
+		Args{User{10, "Selma", 0}, 1},
+		"UPDATE {user} SET {id} = 10, {user_name} = 'Selma' WHERE {id} = 1",
+	},
 
-	{"SELECT * FROM user WHERE id IN (?...)", Args{[]int{1, 4, 7, 11}},
-		"SELECT * FROM user WHERE id IN (1, 4, 7, 11)"},
+	{
+		"SELECT * FROM user WHERE id IN (?...)",
+		Args{[]int{1, 4, 7, 11}},
+		"SELECT * FROM user WHERE id IN (1, 4, 7, 11)",
+	},
 
-	{"INSERT ?values", Args{&User{1, "Rudolf", 0}},
-		"INSERT ({id}, {user_name}) VALUES (1, 'Rudolf')"},
-	{"INSERT ?values...", Args{[]*User{{1, "Martin", 0}}},
-		"INSERT ({id}, {user_name}) VALUES (1, 'Martin')"},
-	{"INSERT ?values", Args{V{1, "Syd"}},
-		"INSERT ({V_name}) VALUES ('Syd')"},
-	{"INSERT ?values", Args{Map{"rank": "Colonel", "id": 3, "name": "Frank"}},
-		"INSERT ({id}, {name}, {rank}) VALUES (3, 'Frank', 'Colonel')"},
+	{
+		"INSERT ?values",
+		Args{&User{1, "Rudolf", 0}},
+		"INSERT ({id}, {user_name}) VALUES (1, 'Rudolf')",
+	},
+	{
+		"INSERT ?values...",
+		Args{[]*User{{1, "Martin", 0}}},
+		"INSERT ({id}, {user_name}) VALUES (1, 'Martin')",
+	},
+	{
+		"INSERT ?values",
+		Args{V{1, "Syd"}},
+		"INSERT ({V_name}) VALUES ('Syd')",
+	},
+	{
+		"INSERT ?values",
+		Args{Map{"rank": "Colonel", "id": 3, "name": "Frank"}},
+		"INSERT ({id}, {name}, {rank}) VALUES (3, 'Frank', 'Colonel')",
+	},
 
-	{"SELECT ?, ?, ?", Args{MyString("ahoj"), strPtr("ciao"), (*string)(nil)},
-		"SELECT 'ahoj', 'ciao', NULL"},
+	{
+		"SELECT ?, ?, ?",
+		Args{MyString("ahoj"), strPtr("ciao"), (*string)(nil)},
+		"SELECT 'ahoj', 'ciao', NULL",
+	},
 
 	// embedded structs
-	{"INSERT ?values", Args{E{1, Name{"John", "Doe"}}},
-		"INSERT ({ID}, {First}, {Last}) VALUES (1, 'John', 'Doe')"},
-	{"INSERT ?values", Args{Person{1, personProps{"John Doe"}}},
-		"INSERT ({ID}, {Name}) VALUES (1, 'John Doe')"},
+	{
+		"INSERT ?values",
+		Args{E{1, Name{"John", "Doe"}}},
+		"INSERT ({ID}, {First}, {Last}) VALUES (1, 'John', 'Doe')",
+	},
+	{
+		"INSERT ?values",
+		Args{Person{1, personProps{"John Doe"}}},
+		"INSERT ({ID}, {Name}) VALUES (1, 'John Doe')",
+	},
 
 	// ignored embedded structs
-	{"?values", Args{SpecialStruct{"Waking up", parseTime("2015-04-05 06:07:08"), sql.NullString{}}},
+	{
+		"?values",
+		Args{SpecialStruct{"Waking up", parseTime("2015-04-05 06:07:08"), sql.NullString{}}},
 		"({Event}, {Started}, {Finished}) VALUES ('Waking up', " +
-			"'2015-04-05 06:07:08 +0000 UTC', NULL)"},
-	{"?values", Args{SpecialStruct{"Waking up", parseTime("2015-04-05 06:07:08"),
-		sql.NullString{"2015-04-05 06:38:15", true}}},
+			"'2015-04-05 06:07:08 +0000 UTC', NULL)",
+	},
+	{
+		"?values",
+		Args{SpecialStruct{
+			"Waking up", parseTime("2015-04-05 06:07:08"),
+			sql.NullString{String: "2015-04-05 06:38:15", Valid: true},
+		}},
 		"({Event}, {Started}, {Finished}) VALUES ('Waking up', " +
-			"'2015-04-05 06:07:08 +0000 UTC', '2015-04-05 06:38:15')"},
+			"'2015-04-05 06:07:08 +0000 UTC', '2015-04-05 06:38:15')",
+	},
 
 	// ignore valuer but not scanner
 	{"?values", Args{VS{Val{2, 3}, Scan{"A", "B"}}}, "({Val}, {A}, {B}) VALUES (5, 'A', 'B')"},
 
 	// ,selectonly
-	{"INSERT ?values", Args{Omit{Name: "John", Age: 21}},
-		"INSERT ({Name}, {Age}) VALUES ('John', 21)"},
-	{"INSERT ?values", Args{Omit2{Name: "Rudolf", Age: 28}},
-		"INSERT ({Name}, {Age}) VALUES ('Rudolf', 28)"},
+	{
+		"INSERT ?values",
+		Args{Omit{Name: "John", Age: 21}},
+		"INSERT ({Name}, {Age}) VALUES ('John', 21)",
+	},
+	{
+		"INSERT ?values",
+		Args{Omit2{Name: "Rudolf", Age: 28}},
+		"INSERT ({Name}, {Age}) VALUES ('Rudolf', 28)",
+	},
 
 	// ?sql
 	{"SELECT ?sql", Args{"* FROM user"}, "SELECT * FROM user"},
-	{"SELECT WHERE ?sql", Args{new(Where).And("name = ?", "Josef").And("age > ?", 30)},
-		"SELECT WHERE (name = 'Josef') AND (age > 30)"},
+	{
+		"SELECT WHERE ?sql",
+		Args{new(Where).And("name = ?", "Josef").And("age > ?", 30)},
+		"SELECT WHERE (name = 'Josef') AND (age > 30)",
+	},
 
 	{"SELECT * WHERE x IN (?...)", Args{[]string{}}, "SELECT * WHERE x IN (NULL)"},
 }
@@ -211,14 +267,20 @@ var errorTests = []struct {
 	{"INSERT INTO ?", Args{func() {}}, "dali: invalid argument type: func()"},
 	{"WHERE IN ?...", Args{14}, "dali: ?... expects the argument to be a slice"},
 	{"INSERT ?values", Args{ptrPtrUser()}, "dali: argument must be a pointer to a struct"},
-	{"INSERT ?values...", Args{[]**User{}},
-		"dali: ?values... expects the argument to be a slice of structs"},
+	{
+		"INSERT ?values...",
+		Args{[]**User{}},
+		"dali: ?values... expects the argument to be a slice of structs",
+	},
 
 	// empty slice
 	{"SELECT ?ident...", Args{[]int{}}, "dali: ?ident... expects the argument to be a []string"},
 	{"SELECT ?ident...", Args{[]string{}}, "dali: empty slice passed to ?ident..."},
-	{"INSERT ?values...", Args{[]string{}},
-		"dali: ?values... expects the argument to be a slice of structs"},
+	{
+		"INSERT ?values...",
+		Args{[]string{}},
+		"dali: ?values... expects the argument to be a slice of structs",
+	},
 	{"INSERT ?values...", Args{[]User{}}, "dali: empty slice passed to ?values..."},
 
 	// empty columns
@@ -230,8 +292,11 @@ var errorTests = []struct {
 
 	// ?sql
 	{"INSERT INTO ?sql", Args{5}, "dali: ?sql expects the argument to be a string or Marshaler"},
-	{"SELECT WHERE ?sql", Args{new(Where).And("?")},
-		"dali: marshal SQL: dali: there is not enough args for placeholders"},
+	{
+		"SELECT WHERE ?sql",
+		Args{new(Where).And("?")},
+		"dali: marshal SQL: dali: there is not enough args for placeholders",
+	},
 }
 
 func TestErrors(t *testing.T) {
@@ -266,19 +331,31 @@ var typesTests = []struct {
 	expSQL string
 }{
 	{"?, ?", Args{true, false}, "true, false"},
-	{"?, ?, ?, ?, ?", Args{int(-1), int8(-2), int16(-3), int32(-4), int64(-5)},
-		"-1, -2, -3, -4, -5"},
-	{"?, ?, ?, ?, ?", Args{uint(1), uint8(2), uint16(3), uint32(4), uint64(5)},
-		"1, 2, 3, 4, 5"},
+	{
+		"?, ?, ?, ?, ?",
+		Args{int(-1), int8(-2), int16(-3), int32(-4), int64(-5)},
+		"-1, -2, -3, -4, -5",
+	},
+	{
+		"?, ?, ?, ?, ?",
+		Args{uint(1), uint8(2), uint16(3), uint32(4), uint64(5)},
+		"1, 2, 3, 4, 5",
+	},
 	{"?, ?", Args{float32(1.5), float64(2.71828)}, "1.5, 2.71828"},
-	{"?", Args{"příliš žluťoučký kůň úpěl ďábelské ódy"},
-		"'příliš žluťoučký kůň úpěl ďábelské ódy'"},
+	{
+		"?",
+		Args{"příliš žluťoučký kůň úpěl ďábelské ódy"},
+		"'příliš žluťoučký kůň úpěl ďábelské ódy'",
+	},
 	{"?", Args{[]byte("binary text")}, "`binary text`"},
 	{"?", Args{sometime}, "'2015-03-05 10:42:43 +0000 UTC'"},
 
 	// NULL
-	{"?, ?", Args{sql.NullString{String: "Homer", Valid: true}, sql.NullString{String: "Homer"}},
-		"'Homer', NULL"},
+	{
+		"?, ?",
+		Args{sql.NullString{String: "Homer", Valid: true}, sql.NullString{String: "Homer"}},
+		"'Homer', NULL",
+	},
 	{"?", Args{(*Val)(nil)}, "NULL"},
 }
 
@@ -306,7 +383,6 @@ var preparedStmtTests = []struct {
 	wantSQL string
 	wantErr string
 }{
-
 	{"SELECT ?ident WHERE [id] = ?", Args{"name"}, "SELECT {name} WHERE {id} = &1", ""},
 	{"WHERE [name] LIKE ? AND [age] < ?", Args{}, "WHERE {name} LIKE &1 AND {age} < &2", ""},
 
@@ -321,8 +397,11 @@ var preparedStmtTests = []struct {
 	{"INSERT ?set", Args{}, "", "dali: ?set cannot be used in prepared statements"},
 
 	// ?sql
-	{"SELECT WHERE ?sql", Args{new(Where).And("x IN (?...)", []int{2, 3})},
-		"", "dali: marshal SQL: dali: ?... cannot be used in prepared statements"},
+	{
+		"SELECT WHERE ?sql",
+		Args{new(Where).And("x IN (?...)", []int{2, 3})},
+		"", "dali: marshal SQL: dali: ?... cannot be used in prepared statements",
+	},
 }
 
 func TestPreparedStmts(t *testing.T) {

@@ -70,6 +70,7 @@ func (FakeRows) Close() error { return nil }
 
 // implement
 func (r *FakeRows) Columns() []string { return r.d.cols }
+
 func (r *FakeRows) Next(dest []driver.Value) error {
 	if r.d.cur >= len(r.d.result) {
 		return io.EOF
@@ -100,6 +101,7 @@ type FakeTx struct{}
 func (FakeTx) Commit() error {
 	panic("not implemented")
 }
+
 func (FakeTx) Rollback() error {
 	panic("not implemented")
 }

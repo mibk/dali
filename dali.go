@@ -157,6 +157,7 @@ type Execer interface {
 // LastInsertID is a helper that wraps a call to a function returning
 // (res sql.Result, err error). It returns err if it is not nil, otherwise
 // it returns res.LastInsertId(). It is intended for uses such as
+//
 //	q := db.Query(...)
 //	id, err := dali.LastInsertID(q.Exec())
 func LastInsertID(res sql.Result, err error) (int64, error) {

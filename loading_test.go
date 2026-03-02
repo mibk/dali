@@ -64,53 +64,73 @@ func Test_One_and_All(t *testing.T) {
 		method   func(q *Query, dest interface{}) error
 		expected interface{}
 	}{
-		{cols("ID", "Name"), result(U{2, "Caroline"}, U{3, "Mark"}, U{4, "Lucas"}),
+		{
+			cols("ID", "Name"), result(U{2, "Caroline"}, U{3, "Mark"}, U{4, "Lucas"}),
 			newTypeOf([]U{}), (*Query).All,
 			[]U{{2, "Caroline"}, {3, "Mark"}, {4, "Lucas"}},
 		},
-		{cols("ID", "Name"), result(U{1, "Alice"}, U{2, "Bob"}, U{13, "Carmen"}),
+		{
+			cols("ID", "Name"), result(U{1, "Alice"}, U{2, "Bob"}, U{13, "Carmen"}),
 			newTypeOf([]*U{}), (*Query).All,
 			[]*U{{1, "Alice"}, {2, "Bob"}, {13, "Carmen"}},
 		},
 
 		// column names from field tags
-		{cols("ID", "V_name"), result(Vres{1, "Justin"}, Vres{2, "Martin"}, Vres{13, "Lis"}),
+		{
+			cols("ID", "V_name"), result(Vres{1, "Justin"}, Vres{2, "Martin"}, Vres{13, "Lis"}),
 			newTypeOf([]V{}), (*Query).All,
 			[]V{{0, "Justin"}, {0, "Martin"}, {0, "Lis"}},
 		},
 
-		{cols("ID", "Name"), result(U{1, "Thomas"}, U{2, "Bob"}, U{13, "Carmen"}),
+		{
+			cols("ID", "Name"), result(U{1, "Thomas"}, U{2, "Bob"}, U{13, "Carmen"}),
 			newTypeOf(U{}), (*Query).One,
 			U{1, "Thomas"},
 		},
 
 		// embedded structs
-		{cols("ID", "First", "Last"), result(Eres{1, "Thomas", "Shoe"}, Eres{4, "Bob", "Webber"}),
+		{
+			cols("ID", "First", "Last"), result(Eres{1, "Thomas", "Shoe"}, Eres{4, "Bob", "Webber"}),
 			newTypeOf([]E{}), (*Query).All,
 			[]E{{1, Name{"Thomas", "Shoe"}}, {4, Name{"Bob", "Webber"}}},
 		},
 
 		// ignored embedded structs
-		{cols("Event", "Started", "Finished"), result(SpecialStructRes{"Lunch",
-			parseTime("2015-05-05 12:24:32"), nil}),
+		{
+			cols("Event", "Started", "Finished"), result(SpecialStructRes{
+				"Lunch",
+				parseTime("2015-05-05 12:24:32"), nil,
+			}),
 			newTypeOf(SpecialStruct{}), (*Query).One,
-			SpecialStruct{"Lunch", parseTime("2015-05-05 12:24:32"), sql.NullString{}}},
-		{cols("Event", "Started", "Finished"), result(SpecialStructRes{"Lunch",
-			parseTime("2015-05-05 12:24:32"), "2015-05-05 13:08:17"}),
+			SpecialStruct{"Lunch", parseTime("2015-05-05 12:24:32"), sql.NullString{}},
+		},
+		{
+			cols("Event", "Started", "Finished"), result(SpecialStructRes{
+				"Lunch",
+				parseTime("2015-05-05 12:24:32"), "2015-05-05 13:08:17",
+			}),
 			newTypeOf(SpecialStruct{}), (*Query).One,
-			SpecialStruct{"Lunch", parseTime("2015-05-05 12:24:32"),
-				sql.NullString{"2015-05-05 13:08:17", true}}},
+			SpecialStruct{
+				"Lunch", parseTime("2015-05-05 12:24:32"),
+				sql.NullString{String: "2015-05-05 13:08:17", Valid: true},
+			},
+		},
 
 		// ignore scanner but not valuer
-		{cols("A", "B", "Scan"), result(VSres{2, 3, "group:name"}),
-			newTypeOf(VS{}), (*Query).One, VS{Val{2, 3}, Scan{"group", "name"}}},
+		{
+			cols("A", "B", "Scan"), result(VSres{2, 3, "group:name"}),
+			newTypeOf(VS{}), (*Query).One,
+			VS{Val{2, 3}, Scan{"group", "name"}},
+		},
 
 		// ,selectonly
-		{cols("ID", "Name", "Age"), result(Omit{1, "Barbora", 19}, Omit{4, "Bob", 23}),
+		{
+			cols("ID", "Name", "Age"), result(Omit{1, "Barbora", 19}, Omit{4, "Bob", 23}),
 			newTypeOf([]Omit{}), (*Query).All,
 			[]Omit{{1, "Barbora", 19}, {4, "Bob", 23}},
 		},
-		{cols("Id_user", "Name", "Age"), result(Omit2res{1, "Hubert", 32}, Omit2res{4, "Bob", 23}),
+		{
+			cols("Id_user", "Name", "Age"), result(Omit2res{1, "Hubert", 32}, Omit2res{4, "Bob", 23}),
 			newTypeOf([]Omit2{}), (*Query).All,
 			[]Omit2{{1, "Hubert", 32}, {4, "Bob", 23}},
 		},
@@ -132,7 +152,7 @@ func Test_One_and_All(t *testing.T) {
 func TestNoRows(t *testing.T) {
 	dvr.SetColumns("ID", "Name").SetResult()
 
-	var rows = []struct{}{{}, {}}
+	rows := []struct{}{{}, {}}
 	if err := db.Query("").All(&rows); err != nil {
 		t.Errorf("unexpected err: %v", err)
 	}
@@ -143,7 +163,7 @@ func TestNoRows(t *testing.T) {
 		t.Errorf("cap(rows) must be 0, got %d", cap(rows))
 	}
 
-	var vals = []struct{}{{}, {}}
+	vals := []struct{}{{}, {}}
 	vals2 := vals
 	if err := db.Query("").ScanAllRows(&vals, &vals2); err != nil {
 		t.Errorf("unexpected err: %v", err)
@@ -213,10 +233,14 @@ func TestLoading_Types(t *testing.T) {
 		{result(struct{ A bool }{true}), newTypeOf(false), true},
 		{result(struct{ A bool }{false}), newTypeOf(false), false},
 		{result(struct{ A string }{"Carl"}), newTypeOf(""), "Carl"},
-		{result(struct{ A string }{"Lucas"}), newTypeOf(sql.NullString{}),
-			sql.NullString{String: "Lucas", Valid: true}},
-		{result(struct{ A interface{} }{nil}), newTypeOf(sql.NullString{}),
-			sql.NullString{}},
+		{
+			result(struct{ A string }{"Lucas"}), newTypeOf(sql.NullString{}),
+			sql.NullString{String: "Lucas", Valid: true},
+		},
+		{
+			result(struct{ A interface{} }{nil}), newTypeOf(sql.NullString{}),
+			sql.NullString{},
+		},
 	}
 
 	for _, tt := range tests {
@@ -239,7 +263,6 @@ func TestErrNoRows(t *testing.T) {
 	if err := db.Query("").One(&u); err != sql.ErrNoRows {
 		t.Errorf("Query.One should return sql.ErrNoRows if there are no rows\ngot %v", err)
 	}
-
 }
 
 func TestEmptyColumns(t *testing.T) {
@@ -250,12 +273,16 @@ func TestEmptyColumns(t *testing.T) {
 		method func(q *Query, dest interface{}) error
 		expErr string
 	}{
-		{cols("ID", "Name"), result(U{2, "Caroline"}, U{3, "Mark"}, U{4, "Lucas"}),
+		{
+			cols("ID", "Name"), result(U{2, "Caroline"}, U{3, "Mark"}, U{4, "Lucas"}),
 			newTypeOf(V{}), (*Query).One,
-			"dali: no match between columns and struct fields"}, // #1
-		{cols("ID", "Name"), result(U{2, "Caroline"}, U{3, "Mark"}, U{4, "Lucas"}),
+			"dali: no match between columns and struct fields",
+		}, // #1
+		{
+			cols("ID", "Name"), result(U{2, "Caroline"}, U{3, "Mark"}, U{4, "Lucas"}),
 			newTypeOf([]V{}), (*Query).All,
-			"dali: no match between columns and struct fields"},
+			"dali: no match between columns and struct fields",
+		},
 	}
 
 	for i, tt := range tests {

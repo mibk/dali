@@ -39,6 +39,7 @@ func translate(d dialect.Dialect, sql string, args []interface{}) (string, error
 	}
 	return t.Translate(sql, args)
 }
+
 func translatePreparedStmt(d dialect.Dialect, sql string, args []interface{}) (string, error) {
 	t := Translator{
 		dialect:      d,
@@ -354,7 +355,7 @@ func (p *Translator) deriveColsAndVals(v interface{}) (cols []string, vals []int
 	if len(cols) == 0 {
 		err = errNoCols(v)
 	}
-	return
+	return cols, vals, err
 }
 
 func (p *Translator) printMultiValuesClause(b *bytes.Buffer, v interface{}) error {
@@ -416,5 +417,5 @@ func valuesByFieldIndexes(v reflect.Value, indexes [][]int) (vals []interface{})
 	for _, index := range indexes {
 		vals = append(vals, v.FieldByIndex(index).Interface())
 	}
-	return
+	return vals
 }
