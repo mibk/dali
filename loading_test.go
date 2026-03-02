@@ -323,7 +323,7 @@ func BenchmarkLoadingOne(b *testing.B) {
 	dvr.SetColumns("ID", "Name").SetResult(U{1, "John"})
 	b.ResetTimer()
 	var u U
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		db.Query("").One(&u)
 	}
 }
@@ -332,7 +332,49 @@ func BenchmarkLoadingAll(b *testing.B) {
 	dvr.SetColumns("ID", "Name").SetResult(U{1, "John"}, U{2, "Patrik"}, U{3, "Tomáš"})
 	b.ResetTimer()
 	var u []U
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		db.Query("").All(&u)
+	}
+}
+
+type WideStruct struct {
+	ID      int64
+	Name    string
+	Email   string
+	GroupID int64
+	Active  bool
+}
+
+func BenchmarkLoadingOne_wide(b *testing.B) {
+	dvr.SetColumns("ID", "Name", "Email", "GroupID", "Active").
+		SetResult(WideStruct{1, "John", "john@example.com", 42, true})
+	b.ResetTimer()
+	var w WideStruct
+	for b.Loop() {
+		db.Query("").One(&w)
+	}
+}
+
+func BenchmarkLoadingAll_wide(b *testing.B) {
+	dvr.SetColumns("ID", "Name", "Email", "GroupID", "Active").
+		SetResult(
+			WideStruct{1, "John", "john@example.com", 42, true},
+			WideStruct{2, "Jane", "jane@example.com", 7, true},
+			WideStruct{3, "Bob", "bob@example.com", 42, false},
+		)
+	b.ResetTimer()
+	var w []WideStruct
+	for b.Loop() {
+		db.Query("").All(&w)
+	}
+}
+
+func BenchmarkLoadingAll_embedded(b *testing.B) {
+	dvr.SetColumns("ID", "First", "Last").
+		SetResult(Eres{1, "Thomas", "Shoe"}, Eres{4, "Bob", "Webber"})
+	b.ResetTimer()
+	var e []E
+	for b.Loop() {
+		db.Query("").All(&e)
 	}
 }
