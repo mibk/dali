@@ -66,14 +66,14 @@ func (t Translator) clone() Translator {
 	}
 }
 
-func (p *Translator) checkInterpolationOf(placeholder string) error {
-	if p.preparedStmt {
+func (t *Translator) checkInterpolationOf(placeholder string) error {
+	if t.preparedStmt {
 		return fmt.Errorf("%s cannot be used in prepared statements", placeholder)
 	}
 	return nil
 }
 
-func (p *Translator) translate(sql string) (string, error) {
+func (t *Translator) translate(sql string) (string, error) {
 	b := new(bytes.Buffer)
 	pos := 0
 	for pos < len(sql) {
@@ -87,7 +87,7 @@ func (p *Translator) translate(sql string) (string, error) {
 				return "", fmt.Errorf("identifier not terminated")
 			}
 			col := sql[pos : pos+w]
-			p.dialect.EscapeIdent(b, col)
+			t.dialect.EscapeIdent(b, col)
 			pos += w + 1 // size of ']'
 		case '?':
 			start, end := pos, pos
@@ -104,42 +104,42 @@ func (p *Translator) translate(sql string) (string, error) {
 				pos += w
 				end = pos
 			}
-			if err := p.interpolate(b, sql[start:end], expand); err != nil {
+			if err := t.interpolate(b, sql[start:end], expand); err != nil {
 				return "", err
 			}
 		default:
 			b.WriteRune(r)
 		}
 	}
-	if p.index < len(p.args) {
-		return "", fmt.Errorf("only %d args are expected", p.index)
+	if t.index < len(t.args) {
+		return "", fmt.Errorf("only %d args are expected", t.index)
 	}
 	return b.String(), nil
 }
 
-func (p *Translator) nextArg() any {
-	if p.index >= len(p.args) {
-		p.try(fmt.Errorf("there is not enough args for placeholders"))
+func (t *Translator) nextArg() any {
+	if t.index >= len(t.args) {
+		t.try(fmt.Errorf("there is not enough args for placeholders"))
 		return nil
 	}
-	v := p.args[p.index]
-	p.index++
+	v := t.args[t.index]
+	t.index++
 	return v
 }
 
-func (p *Translator) nextParamNumber() int {
-	p.param++
-	return p.param
+func (t *Translator) nextParamNumber() int {
+	t.param++
+	return t.param
 }
 
-func (p *Translator) interpolate(b *bytes.Buffer, typ string, expand bool) error {
+func (t *Translator) interpolate(b *bytes.Buffer, typ string, expand bool) error {
 	if expand {
 		switch typ {
 		case "":
-			p.try(p.checkInterpolationOf("?..."))
-			p.try(p.escapeMultipleValues(b, p.nextArg()))
+			t.try(t.checkInterpolationOf("?..."))
+			t.try(t.escapeMultipleValues(b, t.nextArg()))
 		case "ident":
-			idents, ok := p.nextArg().([]string)
+			idents, ok := t.nextArg().([]string)
 			if !ok {
 				return fmt.Errorf("?ident... expects the argument to be a []string")
 			} else if len(idents) == 0 {
@@ -149,39 +149,39 @@ func (p *Translator) interpolate(b *bytes.Buffer, typ string, expand bool) error
 				if i > 0 {
 					b.WriteString(", ")
 				}
-				p.dialect.EscapeIdent(b, ident)
+				t.dialect.EscapeIdent(b, ident)
 			}
 		case "values":
-			p.try(p.checkInterpolationOf("?values..."))
-			p.try(p.printMultiValuesClause(b, p.nextArg()))
+			t.try(t.checkInterpolationOf("?values..."))
+			t.try(t.printMultiValuesClause(b, t.nextArg()))
 		default:
 			return fmt.Errorf("?%s cannot be expanded (...) or doesn't exist", typ)
 		}
 	} else {
 		switch typ {
 		case "":
-			if p.preparedStmt {
-				p.dialect.PrintPlaceholderSign(b, p.nextParamNumber())
+			if t.preparedStmt {
+				t.dialect.PrintPlaceholderSign(b, t.nextParamNumber())
 				return nil
 			}
-			p.try(p.escapeValue(b, p.nextArg()))
+			t.try(t.escapeValue(b, t.nextArg()))
 		case "ident":
-			ident, ok := p.nextArg().(string)
+			ident, ok := t.nextArg().(string)
 			if !ok {
-				return p.try(
+				return t.try(
 					fmt.Errorf("?ident expects the argument to be a string"))
 			}
-			p.dialect.EscapeIdent(b, ident)
+			t.dialect.EscapeIdent(b, ident)
 		case "values":
-			p.try(p.checkInterpolationOf("?values"))
-			p.try(p.printValuesClause(b, p.nextArg()))
+			t.try(t.checkInterpolationOf("?values"))
+			t.try(t.printValuesClause(b, t.nextArg()))
 		case "set":
-			p.try(p.checkInterpolationOf("?set"))
-			p.try(p.printSetClause(b, p.nextArg()))
+			t.try(t.checkInterpolationOf("?set"))
+			t.try(t.printSetClause(b, t.nextArg()))
 		case "sql":
-			switch arg := p.nextArg().(type) {
+			switch arg := t.nextArg().(type) {
 			case Marshaler:
-				sql, err := arg.MarshalSQL(p.clone())
+				sql, err := arg.MarshalSQL(t.clone())
 				if err != nil {
 					return fmt.Errorf("marshal SQL: %v", err)
 				}
@@ -195,19 +195,19 @@ func (p *Translator) interpolate(b *bytes.Buffer, typ string, expand bool) error
 			return fmt.Errorf("unknown placeholder ?%s", typ)
 		}
 	}
-	return p.err
+	return t.err
 }
 
-func (p *Translator) try(err error) error {
-	if p.err == nil {
-		p.err = err
+func (t *Translator) try(err error) error {
+	if t.err == nil {
+		t.err = err
 	}
-	return p.err
+	return t.err
 }
 
 var timeType = reflect.TypeFor[time.Time]()
 
-func (p *Translator) escapeValue(b *bytes.Buffer, v any) error {
+func (t *Translator) escapeValue(b *bytes.Buffer, v any) error {
 	vv := reflect.ValueOf(v)
 	if valuer, ok := v.(driver.Valuer); ok {
 		if vv.Kind() == reflect.Pointer && vv.IsNil() {
@@ -231,9 +231,9 @@ func (p *Translator) escapeValue(b *bytes.Buffer, v any) error {
 			b.WriteString("NULL")
 			return nil
 		}
-		return p.escapeValue(b, vv.Elem().Interface())
+		return t.escapeValue(b, vv.Elem().Interface())
 	case reflect.Bool:
-		p.dialect.EscapeBool(b, vv.Bool())
+		t.dialect.EscapeBool(b, vv.Bool())
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		formatInt(b, vv.Int())
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
@@ -241,16 +241,16 @@ func (p *Translator) escapeValue(b *bytes.Buffer, v any) error {
 	case reflect.Float32, reflect.Float64:
 		formatFloat(b, vv.Float())
 	case reflect.String:
-		p.dialect.EscapeString(b, vv.String())
+		t.dialect.EscapeString(b, vv.String())
 	case reflect.Slice:
 		if vv.Type().Elem().Kind() == reflect.Uint8 {
-			p.dialect.EscapeBytes(b, vv.Bytes())
+			t.dialect.EscapeBytes(b, vv.Bytes())
 			break
 		}
 		return fmt.Errorf("only a slice of bytes supported; got: %T", v)
 	case reflect.Struct:
 		if vv.Type() == timeType {
-			p.dialect.EscapeTime(b, vv.Interface().(time.Time))
+			t.dialect.EscapeTime(b, vv.Interface().(time.Time))
 			break
 		}
 		fallthrough
@@ -264,7 +264,7 @@ func formatInt(b *bytes.Buffer, i int64)     { b.WriteString(strconv.FormatInt(i
 func formatUint(b *bytes.Buffer, u uint64)   { b.WriteString(strconv.FormatUint(u, 10)) }
 func formatFloat(b *bytes.Buffer, f float64) { b.WriteString(strconv.FormatFloat(f, 'f', -1, 64)) }
 
-func (p *Translator) escapeMultipleValues(b *bytes.Buffer, v any) error {
+func (t *Translator) escapeMultipleValues(b *bytes.Buffer, v any) error {
 	vv := reflect.ValueOf(v)
 	if vv.Kind() != reflect.Slice {
 		return fmt.Errorf("?... expects the argument to be a slice")
@@ -278,15 +278,15 @@ func (p *Translator) escapeMultipleValues(b *bytes.Buffer, v any) error {
 		if i > 0 {
 			b.WriteString(", ")
 		}
-		if err := p.escapeValue(b, vv.Index(i).Interface()); err != nil {
+		if err := t.escapeValue(b, vv.Index(i).Interface()); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (p *Translator) printValuesClause(b *bytes.Buffer, v any) error {
-	cols, vals, err := p.deriveColsAndVals(v)
+func (t *Translator) printValuesClause(b *bytes.Buffer, v any) error {
+	cols, vals, err := t.deriveColsAndVals(v)
 	if err != nil {
 		return err
 	}
@@ -295,21 +295,21 @@ func (p *Translator) printValuesClause(b *bytes.Buffer, v any) error {
 		if i > 0 {
 			b.WriteString(", ")
 		}
-		p.dialect.EscapeIdent(b, c)
+		t.dialect.EscapeIdent(b, c)
 	}
 	b.WriteString(") VALUES (")
 	for i, v := range vals {
 		if i > 0 {
 			b.WriteString(", ")
 		}
-		p.try(p.escapeValue(b, v))
+		t.try(t.escapeValue(b, v))
 	}
 	b.WriteRune(')')
 	return nil
 }
 
-func (p *Translator) printSetClause(b *bytes.Buffer, v any) error {
-	cols, vals, err := p.deriveColsAndVals(v)
+func (t *Translator) printSetClause(b *bytes.Buffer, v any) error {
+	cols, vals, err := t.deriveColsAndVals(v)
 	if err != nil {
 		return err
 	}
@@ -319,16 +319,16 @@ func (p *Translator) printSetClause(b *bytes.Buffer, v any) error {
 			b.WriteString(", ")
 		}
 		v := vals[i]
-		p.dialect.EscapeIdent(b, c)
+		t.dialect.EscapeIdent(b, c)
 		b.WriteString(" = ")
-		p.try(p.escapeValue(b, v))
+		t.try(t.escapeValue(b, v))
 	}
 	return nil
 }
 
 // deriveColsAndVals derives column names from an underlying type of v and returns
 // them together with the corresponding values.
-func (p *Translator) deriveColsAndVals(v any) (cols []string, vals []any, err error) {
+func (t *Translator) deriveColsAndVals(v any) (cols []string, vals []any, err error) {
 	switch v := v.(type) {
 	case Map:
 		keys := make([]string, 0, len(v))
@@ -358,7 +358,7 @@ func (p *Translator) deriveColsAndVals(v any) (cols []string, vals []any, err er
 	return cols, vals, err
 }
 
-func (p *Translator) printMultiValuesClause(b *bytes.Buffer, v any) error {
+func (t *Translator) printMultiValuesClause(b *bytes.Buffer, v any) error {
 	errInvalidArg := fmt.Errorf("?values... expects the argument to be a slice of structs")
 	vv := reflect.ValueOf(v)
 	if vv.Kind() != reflect.Slice {
@@ -385,7 +385,7 @@ func (p *Translator) printMultiValuesClause(b *bytes.Buffer, v any) error {
 		if i > 0 {
 			b.WriteString(", ")
 		}
-		p.dialect.EscapeIdent(b, c)
+		t.dialect.EscapeIdent(b, c)
 	}
 	b.WriteString(") VALUES")
 	for i, length := 0, vv.Len(); i < length; i++ {
@@ -399,7 +399,7 @@ func (p *Translator) printMultiValuesClause(b *bytes.Buffer, v any) error {
 			if i > 0 {
 				b.WriteString(", ")
 			}
-			p.try(p.escapeValue(b, v))
+			t.try(t.escapeValue(b, v))
 		}
 		b.WriteRune(')')
 		if i != length-1 {

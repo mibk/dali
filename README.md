@@ -1,6 +1,5 @@
 ![DALí Logo](dali.png) &nbsp;
-[![GoDoc](https://godoc.org/github.com/mibk/dali?status.png)](https://godoc.org/github.com/mibk/dali)
-[![Build Status](https://travis-ci.org/mibk/dali.png)](https://travis-ci.org/mibk/dali)
+[![Go Reference](https://pkg.go.dev/badge/github.com/mibk/dali.svg)](https://pkg.go.dev/github.com/mibk/dali)
 
 # Database Abstraction Layer (í)
 
@@ -150,7 +149,7 @@ method Prepare for more information).
 
 ### Profiling and other
 
-Using the [DB.SetMiddlewareFunc](https://godoc.org/github.com/mibk/dali#DB.SetMiddlewareFunc) it is
+Using the [DB.SetMiddlewareFunc](https://pkg.go.dev/github.com/mibk/dali#DB.SetMiddlewareFunc) it is
 possible to do additional operations before and after execution of every query. This example
 logs every executed query:
 
@@ -169,19 +168,19 @@ type profiler struct {
 	ex dali.Execer
 }
 
-func (p profiler) Exec(query string, args ...interface{}) (sql.Result, error) {
+func (p profiler) ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
 	log.Println(query, args)
-	return p.ex.Exec(query, args...)
+	return p.ex.ExecContext(ctx, query, args...)
 }
 
-func (p profiler) Query(query string, args ...interface{}) (*sql.Rows, error) {
+func (p profiler) QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
 	log.Println(query, args)
-	return p.ex.Query(query, args...)
+	return p.ex.QueryContext(ctx, query, args...)
 }
 
-func (p profiler) QueryRow(query string, args ...interface{}) *sql.Row {
+func (p profiler) QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row {
 	log.Println(query, args)
-	return p.ex.QueryRow(query, args...)
+	return p.ex.QueryRowContext(ctx, query, args...)
 }
 ```
 
