@@ -15,11 +15,13 @@ func TestEscapeIdent(t *testing.T) {
 		{"some`name", "`some``name`"},
 	}
 	for _, tt := range tests {
-		b := new(bytes.Buffer)
-		MySQL.EscapeIdent(b, tt.v)
-		if got := b.String(); got != tt.exp {
-			t.Errorf("got %v, want %v", got, tt.exp)
-		}
+		t.Run(tt.v, func(t *testing.T) {
+			b := new(bytes.Buffer)
+			MySQL.EscapeIdent(b, tt.v)
+			if got := b.String(); got != tt.exp {
+				t.Errorf("got %v, want %v", got, tt.exp)
+			}
+		})
 	}
 }
 
@@ -32,11 +34,13 @@ func TestEscapeBool(t *testing.T) {
 		{true, "1"},
 	}
 	for _, tt := range tests {
-		b := new(bytes.Buffer)
-		MySQL.EscapeBool(b, tt.v)
-		if got := b.String(); got != tt.exp {
-			t.Errorf("got %v, want %v", got, tt.exp)
-		}
+		t.Run(tt.exp, func(t *testing.T) {
+			b := new(bytes.Buffer)
+			MySQL.EscapeBool(b, tt.v)
+			if got := b.String(); got != tt.exp {
+				t.Errorf("got %v, want %v", got, tt.exp)
+			}
+		})
 	}
 }
 
@@ -52,11 +56,13 @@ func TestEscapeString(t *testing.T) {
 		{"příliš žluťoučký kůň úpěl ďábelské ódy", "'příliš žluťoučký kůň úpěl ďábelské ódy'"},
 	}
 	for _, tt := range tests {
-		b := new(bytes.Buffer)
-		MySQL.EscapeString(b, tt.v)
-		if got := b.String(); got != tt.exp {
-			t.Errorf("got %v, want %v", got, tt.exp)
-		}
+		t.Run(tt.exp, func(t *testing.T) {
+			b := new(bytes.Buffer)
+			MySQL.EscapeString(b, tt.v)
+			if got := b.String(); got != tt.exp {
+				t.Errorf("got %v, want %v", got, tt.exp)
+			}
+		})
 	}
 }
 
@@ -68,11 +74,13 @@ func TestEscapeBytes(t *testing.T) {
 		{[]byte("a slice"), "_binary'a slice'"},
 	}
 	for _, tt := range tests {
-		b := new(bytes.Buffer)
-		MySQL.EscapeBytes(b, tt.v)
-		if got := b.String(); got != tt.exp {
-			t.Errorf("got %v, want %v", got, tt.exp)
-		}
+		t.Run(tt.exp, func(t *testing.T) {
+			b := new(bytes.Buffer)
+			MySQL.EscapeBytes(b, tt.v)
+			if got := b.String(); got != tt.exp {
+				t.Errorf("got %v, want %v", got, tt.exp)
+			}
+		})
 	}
 }
 
@@ -103,10 +111,12 @@ func TestEscapeTime(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		b := new(bytes.Buffer)
-		MySQL.EscapeTime(b, tt.v)
-		if got := b.String(); got != tt.exp {
-			t.Errorf("%v: got %v, want %v", tt.v, got, tt.exp)
-		}
+		t.Run(tt.exp, func(t *testing.T) {
+			b := new(bytes.Buffer)
+			MySQL.EscapeTime(b, tt.v)
+			if got := b.String(); got != tt.exp {
+				t.Errorf("got %v, want %v", got, tt.exp)
+			}
+		})
 	}
 }

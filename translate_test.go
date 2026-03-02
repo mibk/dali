@@ -144,13 +144,15 @@ var placeholderTests = []struct {
 func TestPlaceholders(t *testing.T) {
 	tr := Translator{dialect: FakeDialect{}}
 	for _, tt := range placeholderTests {
-		str, err := tr.Translate(tt.sql, tt.args)
-		if err != nil {
-			t.Fatalf("unexpected err: %s:\n %v", tt.sql, err)
-		}
-		if str != tt.expSQL {
-			t.Errorf("\n got: %v\nwant: %v", str, tt.expSQL)
-		}
+		t.Run(tt.sql, func(t *testing.T) {
+			str, err := tr.Translate(tt.sql, tt.args)
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+			if str != tt.expSQL {
+				t.Errorf("\n got: %v\nwant: %v", str, tt.expSQL)
+			}
+		})
 	}
 }
 
@@ -301,14 +303,15 @@ var errorTests = []struct {
 func TestErrors(t *testing.T) {
 	tr := Translator{dialect: FakeDialect{}}
 	for _, tt := range errorTests {
-		_, err := tr.Translate(tt.sql, tt.args)
-		if err == nil {
-			t.Errorf("%s: an error was expected but none given", tt.sql)
-			continue
-		}
-		if err.Error() != tt.err {
-			t.Errorf("%s:\n got: %v,\nwant: %v", tt.sql, err, tt.err)
-		}
+		t.Run(tt.sql, func(t *testing.T) {
+			_, err := tr.Translate(tt.sql, tt.args)
+			if err == nil {
+				t.Fatal("an error was expected but none given")
+			}
+			if err.Error() != tt.err {
+				t.Errorf("\n got: %v\nwant: %v", err, tt.err)
+			}
+		})
 	}
 }
 
@@ -361,13 +364,15 @@ var typesTests = []struct {
 func TestPreprocessingTypes(t *testing.T) {
 	tr := Translator{dialect: FakeDialect{}}
 	for _, tt := range typesTests {
-		str, err := tr.Translate(tt.sql, tt.args)
-		if err != nil {
-			t.Fatalf("unexpected err: %s:\n %v", tt.sql, err)
-		}
-		if str != tt.expSQL {
-			t.Errorf("\n got: %v\nwant: %v", str, tt.expSQL)
-		}
+		t.Run(tt.sql, func(t *testing.T) {
+			str, err := tr.Translate(tt.sql, tt.args)
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+			if str != tt.expSQL {
+				t.Errorf("\n got: %v\nwant: %v", str, tt.expSQL)
+			}
+		})
 	}
 }
 
@@ -406,21 +411,23 @@ var preparedStmtTests = []struct {
 func TestPreparedStmts(t *testing.T) {
 	tr := Translator{dialect: FakeDialect{}, preparedStmt: true}
 	for _, tt := range preparedStmtTests {
-		str, err := tr.Translate(tt.sql, tt.args)
-		var gotErr string
-		if err != nil {
-			gotErr = err.Error()
-		}
-		if gotErr != tt.wantErr {
-			var wantErr error
-			if tt.wantErr != "" {
-				wantErr = fmt.Errorf("%s", tt.wantErr)
+		t.Run(tt.sql, func(t *testing.T) {
+			str, err := tr.Translate(tt.sql, tt.args)
+			var gotErr string
+			if err != nil {
+				gotErr = err.Error()
 			}
-			t.Errorf("%s:\ngot err: %v\n   want: %v", tt.sql, err, wantErr)
-		}
-		if str != tt.wantSQL {
-			t.Errorf("\n got: %v\nwant: %v", str, tt.wantSQL)
-		}
+			if gotErr != tt.wantErr {
+				var wantErr error
+				if tt.wantErr != "" {
+					wantErr = fmt.Errorf("%s", tt.wantErr)
+				}
+				t.Errorf("got err: %v\n   want: %v", err, wantErr)
+			}
+			if str != tt.wantSQL {
+				t.Errorf("\n got: %v\nwant: %v", str, tt.wantSQL)
+			}
+		})
 	}
 }
 
