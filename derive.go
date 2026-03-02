@@ -5,15 +5,37 @@ import (
 	"database/sql/driver"
 	"reflect"
 	"strings"
+	"sync"
 	"time"
 )
+
+type derivedCols struct {
+	cols    []string
+	indexes [][]int
+}
+
+type deriveCacheKey struct {
+	typ    reflect.Type
+	insert bool
+}
+
+var deriveCache sync.Map // deriveCacheKey -> derivedCols
 
 // colNamesAndFieldIndexes derives column names from a struct type and returns
 // them together with the indexes of used fields. typ must be a struct type.
 // If the tag name equals "-", the field is ignored. If insert is true,
 // fields having the selectonly property are ignored as well.
+//
+// Results are cached since the output depends only on the type and mode.
 func colNamesAndFieldIndexes(typ reflect.Type, insert bool) (cols []string, indexes [][]int) {
-	return colNamesAndFieldIndexesBase(nil, typ, insert)
+	key := deriveCacheKey{typ, insert}
+	if cached, ok := deriveCache.Load(key); ok {
+		dc := cached.(derivedCols)
+		return dc.cols, dc.indexes
+	}
+	cols, indexes = colNamesAndFieldIndexesBase(nil, typ, insert)
+	deriveCache.Store(key, derivedCols{cols, indexes})
+	return cols, indexes
 }
 
 func colNamesAndFieldIndexesBase(baseIndex []int, typ reflect.Type, insert bool) (cols []string, indexes [][]int) {
