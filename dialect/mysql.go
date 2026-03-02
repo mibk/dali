@@ -15,10 +15,11 @@ var MySQL Dialect = mySQL{}
 
 type mySQL struct{}
 
+var backtickReplacer = strings.NewReplacer("`", "``")
+
 func (mySQL) EscapeIdent(w io.Writer, ident string) {
 	writeByte(w, '`')
-	r := strings.NewReplacer("`", "``")
-	io.WriteString(w, r.Replace(ident))
+	io.WriteString(w, backtickReplacer.Replace(ident))
 	writeByte(w, '`')
 }
 
