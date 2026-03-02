@@ -13,7 +13,10 @@ var transactionTests = []struct {
 }
 
 func TestTransactions(t *testing.T) {
-	tx, _ := db.Begin()
+	tx, err := db.Begin()
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, tt := range transactionTests {
 		var q *Query
 		var gotErr error

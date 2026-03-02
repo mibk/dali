@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"fmt"
-	"io"
 	"strings"
 	"testing"
 	"time"
@@ -424,15 +423,6 @@ func TestPreparedStmts(t *testing.T) {
 		}
 	}
 }
-
-type NopDialect struct{}
-
-func (NopDialect) EscapeIdent(w io.Writer, ident string)   {}
-func (NopDialect) EscapeBool(w io.Writer, v bool)          {}
-func (NopDialect) EscapeString(w io.Writer, s string)      {}
-func (NopDialect) EscapeBytes(w io.Writer, b []byte)       {}
-func (NopDialect) EscapeTime(w io.Writer, t time.Time)     {}
-func (NopDialect) PrintPlaceholderSign(w io.Writer, n int) {}
 
 var trans = Translator{dialect: FakeDialect{}}
 

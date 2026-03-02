@@ -7,6 +7,9 @@ import (
 )
 
 func TestMiddleware(t *testing.T) {
+	t.Cleanup(func() {
+		db.SetMiddlewareFunc(func(e Execer) Execer { return e })
+	})
 	m := &middle{}
 	checkmw := func(exp string) {
 		if m.lastq != exp {

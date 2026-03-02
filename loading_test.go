@@ -28,12 +28,16 @@ func TestScanRow(t *testing.T) {
 		name string
 	)
 	dvr.SetColumns("ID").SetResult(U{1, "John"})
-	db.Query("").ScanRow(&id)
+	if err := db.Query("").ScanRow(&id); err != nil {
+		t.Fatal(err)
+	}
 	if id != 1 {
 		t.Errorf("id: got %v, want %v", id, 1)
 	}
 	dvr.SetColumns("Name").SetResult(U{1, "John"})
-	db.Query("").ScanRow(&name)
+	if err := db.Query("").ScanRow(&name); err != nil {
+		t.Fatal(err)
+	}
 	if name != "John" {
 		t.Errorf("name: got %v, want %v", name, "John")
 	}
@@ -45,7 +49,9 @@ func TestScanAllRows(t *testing.T) {
 		names []string
 	)
 	dvr.SetColumns("ID", "Name").SetResult(U{1, "David"}, U{3, "Gareth"})
-	db.Query("").ScanAllRows(&ids, &names)
+	if err := db.Query("").ScanAllRows(&ids, &names); err != nil {
+		t.Fatal(err)
+	}
 	expIDs := []int64{1, 3}
 	expNames := []string{"David", "Gareth"}
 	if !reflect.DeepEqual(ids, expIDs) {
@@ -139,7 +145,7 @@ func Test_One_and_All(t *testing.T) {
 	for _, tt := range tests {
 		dvr.SetColumns(tt.cols...).SetResult(tt.result...)
 		if err := tt.method(db.Query(""), tt.v); err != nil {
-			panic(err)
+			t.Fatal(err)
 		}
 		vv := reflect.ValueOf(tt.v)
 		v := reflect.Indirect(vv).Interface()
@@ -246,7 +252,7 @@ func TestLoading_Types(t *testing.T) {
 	for _, tt := range tests {
 		dvr.SetColumns("A").SetResult(tt.result...)
 		if err := db.Query("").ScanRow(tt.v); err != nil {
-			panic(err)
+			t.Fatal(err)
 		}
 		vv := reflect.ValueOf(tt.v)
 		v := reflect.Indirect(vv).Interface()
@@ -259,7 +265,7 @@ func TestLoading_Types(t *testing.T) {
 
 func TestErrNoRows(t *testing.T) {
 	var u U
-	dvr.SetResult()
+	dvr.SetColumns("ID", "Name").SetResult()
 	if err := db.Query("").One(&u); err != sql.ErrNoRows {
 		t.Errorf("Query.One should return sql.ErrNoRows if there are no rows\ngot %v", err)
 	}
