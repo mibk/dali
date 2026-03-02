@@ -18,7 +18,7 @@ func strPtr(s string) *string {
 
 var placeholderTests = []struct {
 	sql    string
-	args   []interface{}
+	args   []any
 	expSQL string
 }{
 	{
@@ -155,7 +155,7 @@ func TestPlaceholders(t *testing.T) {
 	}
 }
 
-type Args []interface{}
+type Args []any
 
 type User struct {
 	ID     int64  `db:"id"`
@@ -190,7 +190,7 @@ type SpecialStruct struct {
 type SpecialStructRes struct {
 	Event    string
 	Started  time.Time
-	Finished interface{}
+	Finished any
 }
 
 type Val struct {
@@ -207,7 +207,7 @@ type Scan struct {
 
 var _ sql.Scanner = new(Scan)
 
-func (s *Scan) Scan(v interface{}) error {
+func (s *Scan) Scan(v any) error {
 	if v, ok := v.(string); ok {
 		str := strings.Split(v, ":")
 		if len(str) != 2 {
@@ -231,10 +231,10 @@ type OmitEverything struct {
 
 type Where struct {
 	conds []string
-	args  []interface{}
+	args  []any
 }
 
-func (wh *Where) And(sql string, args ...interface{}) *Where {
+func (wh *Where) And(sql string, args ...any) *Where {
 	wh.conds = append(wh.conds, sql)
 	wh.args = append(wh.args, args...)
 	return wh
@@ -255,7 +255,7 @@ type Person struct {
 
 var errorTests = []struct {
 	sql  string
-	args []interface{}
+	args []any
 	err  string
 }{
 	{"SELECT [user FROM", Args{}, "dali: identifier not terminated"},
@@ -327,7 +327,7 @@ var sometime = parseTime("2015-03-05 10:42:43")
 
 var typesTests = []struct {
 	sql    string
-	args   []interface{}
+	args   []any
 	expSQL string
 }{
 	{"?, ?", Args{true, false}, "true, false"},
@@ -379,7 +379,7 @@ func ptrPtrUser() **User {
 
 var preparedStmtTests = []struct {
 	sql     string
-	args    []interface{}
+	args    []any
 	wantSQL string
 	wantErr string
 }{

@@ -27,20 +27,20 @@ type Translator struct {
 	preparedStmt bool
 
 	err  error
-	args []interface{}
+	args []any
 
 	index int // of current arg
 	param int // placeholder index
 }
 
-func translate(d dialect.Dialect, sql string, args []interface{}) (string, error) {
+func translate(d dialect.Dialect, sql string, args []any) (string, error) {
 	t := Translator{
 		dialect: d,
 	}
 	return t.Translate(sql, args)
 }
 
-func translatePreparedStmt(d dialect.Dialect, sql string, args []interface{}) (string, error) {
+func translatePreparedStmt(d dialect.Dialect, sql string, args []any) (string, error) {
 	t := Translator{
 		dialect:      d,
 		preparedStmt: true,
@@ -50,7 +50,7 @@ func translatePreparedStmt(d dialect.Dialect, sql string, args []interface{}) (s
 
 // Translate processes sql and args using the dialect specified in t.
 // It returns the resulting SQL query and an error, if there is one.
-func (t Translator) Translate(sql string, args []interface{}) (string, error) {
+func (t Translator) Translate(sql string, args []any) (string, error) {
 	t.args = args
 	s, err := t.translate(sql)
 	if err != nil {
@@ -117,7 +117,7 @@ func (p *Translator) translate(sql string) (string, error) {
 	return b.String(), nil
 }
 
-func (p *Translator) nextArg() interface{} {
+func (p *Translator) nextArg() any {
 	if p.index >= len(p.args) {
 		p.try(fmt.Errorf("there is not enough args for placeholders"))
 		return nil
@@ -205,12 +205,12 @@ func (p *Translator) try(err error) error {
 	return p.err
 }
 
-var timeType = reflect.TypeOf(time.Time{})
+var timeType = reflect.TypeFor[time.Time]()
 
-func (p *Translator) escapeValue(b *bytes.Buffer, v interface{}) error {
+func (p *Translator) escapeValue(b *bytes.Buffer, v any) error {
 	vv := reflect.ValueOf(v)
 	if valuer, ok := v.(driver.Valuer); ok {
-		if vv.Kind() == reflect.Ptr && vv.IsNil() {
+		if vv.Kind() == reflect.Pointer && vv.IsNil() {
 			b.WriteString("NULL")
 			return nil
 		}
@@ -226,7 +226,7 @@ func (p *Translator) escapeValue(b *bytes.Buffer, v interface{}) error {
 	}
 
 	switch vv.Kind() {
-	case reflect.Ptr:
+	case reflect.Pointer:
 		if vv.IsNil() {
 			b.WriteString("NULL")
 			return nil
@@ -264,7 +264,7 @@ func formatInt(b *bytes.Buffer, i int64)     { b.WriteString(strconv.FormatInt(i
 func formatUint(b *bytes.Buffer, u uint64)   { b.WriteString(strconv.FormatUint(u, 10)) }
 func formatFloat(b *bytes.Buffer, f float64) { b.WriteString(strconv.FormatFloat(f, 'f', -1, 64)) }
 
-func (p *Translator) escapeMultipleValues(b *bytes.Buffer, v interface{}) error {
+func (p *Translator) escapeMultipleValues(b *bytes.Buffer, v any) error {
 	vv := reflect.ValueOf(v)
 	if vv.Kind() != reflect.Slice {
 		return fmt.Errorf("?... expects the argument to be a slice")
@@ -274,7 +274,7 @@ func (p *Translator) escapeMultipleValues(b *bytes.Buffer, v interface{}) error 
 		b.WriteString("NULL")
 		return nil
 	}
-	for i := 0; i < length; i++ {
+	for i := range length {
 		if i > 0 {
 			b.WriteString(", ")
 		}
@@ -285,7 +285,7 @@ func (p *Translator) escapeMultipleValues(b *bytes.Buffer, v interface{}) error 
 	return nil
 }
 
-func (p *Translator) printValuesClause(b *bytes.Buffer, v interface{}) error {
+func (p *Translator) printValuesClause(b *bytes.Buffer, v any) error {
 	cols, vals, err := p.deriveColsAndVals(v)
 	if err != nil {
 		return err
@@ -308,7 +308,7 @@ func (p *Translator) printValuesClause(b *bytes.Buffer, v interface{}) error {
 	return nil
 }
 
-func (p *Translator) printSetClause(b *bytes.Buffer, v interface{}) error {
+func (p *Translator) printSetClause(b *bytes.Buffer, v any) error {
 	cols, vals, err := p.deriveColsAndVals(v)
 	if err != nil {
 		return err
@@ -328,7 +328,7 @@ func (p *Translator) printSetClause(b *bytes.Buffer, v interface{}) error {
 
 // deriveColsAndVals derives column names from an underlying type of v and returns
 // them together with the corresponding values.
-func (p *Translator) deriveColsAndVals(v interface{}) (cols []string, vals []interface{}, err error) {
+func (p *Translator) deriveColsAndVals(v any) (cols []string, vals []any, err error) {
 	switch v := v.(type) {
 	case Map:
 		keys := make([]string, 0, len(v))
@@ -342,7 +342,7 @@ func (p *Translator) deriveColsAndVals(v interface{}) (cols []string, vals []int
 		}
 	default:
 		vv := reflect.ValueOf(v)
-		if vv.Kind() == reflect.Ptr {
+		if vv.Kind() == reflect.Pointer {
 			vv = reflect.Indirect(vv)
 		}
 		if vv.Kind() != reflect.Struct {
@@ -358,7 +358,7 @@ func (p *Translator) deriveColsAndVals(v interface{}) (cols []string, vals []int
 	return cols, vals, err
 }
 
-func (p *Translator) printMultiValuesClause(b *bytes.Buffer, v interface{}) error {
+func (p *Translator) printMultiValuesClause(b *bytes.Buffer, v any) error {
 	errInvalidArg := fmt.Errorf("?values... expects the argument to be a slice of structs")
 	vv := reflect.ValueOf(v)
 	if vv.Kind() != reflect.Slice {
@@ -366,7 +366,7 @@ func (p *Translator) printMultiValuesClause(b *bytes.Buffer, v interface{}) erro
 	}
 	el := vv.Type().Elem()
 	isPtr := false
-	if el.Kind() == reflect.Ptr {
+	if el.Kind() == reflect.Pointer {
 		el = el.Elem()
 		isPtr = true
 	}
@@ -409,11 +409,11 @@ func (p *Translator) printMultiValuesClause(b *bytes.Buffer, v interface{}) erro
 	return nil
 }
 
-func errNoCols(v interface{}) error {
+func errNoCols(v any) error {
 	return fmt.Errorf("no columns derived from %T", v)
 }
 
-func valuesByFieldIndexes(v reflect.Value, indexes [][]int) (vals []interface{}) {
+func valuesByFieldIndexes(v reflect.Value, indexes [][]int) (vals []any) {
 	for _, index := range indexes {
 		vals = append(vals, v.FieldByIndex(index).Interface())
 	}

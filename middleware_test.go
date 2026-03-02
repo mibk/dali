@@ -52,22 +52,22 @@ type middle struct {
 	lastq string
 }
 
-func (p *middle) ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error) {
+func (p *middle) ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
 	p.lastq = query + "-exec"
 	return p.ex.ExecContext(ctx, query, args...)
 }
 
-func (p *middle) QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error) {
+func (p *middle) QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
 	p.lastq = query + "-query"
 	return p.ex.QueryContext(ctx, query, args...)
 }
 
-func (p *middle) QueryRowContext(ctx context.Context, query string, args ...interface{}) *sql.Row {
+func (p *middle) QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row {
 	p.lastq = query + "-queryrow"
 	return p.ex.QueryRowContext(ctx, query, args...)
 }
 
-func (db *DB) mustPrepare(query string, args ...interface{}) *Stmt {
+func (db *DB) mustPrepare(query string, args ...any) *Stmt {
 	s, err := db.Prepare(query, args...)
 	if err != nil {
 		panic(err)
@@ -83,7 +83,7 @@ func (db *DB) mustBegin() *Tx {
 	return tx
 }
 
-func (tx *Tx) mustPrepare(query string, args ...interface{}) *Stmt {
+func (tx *Tx) mustPrepare(query string, args ...any) *Stmt {
 	s, err := tx.Prepare(query, args...)
 	if err != nil {
 		panic(err)

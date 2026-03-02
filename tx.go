@@ -17,7 +17,7 @@ type Tx struct {
 }
 
 // QueryWithContext is a (*DB).Query equivalent for transactions.
-func (tx *Tx) QueryWithContext(ctx context.Context, query string, args ...interface{}) *Query {
+func (tx *Tx) QueryWithContext(ctx context.Context, query string, args ...any) *Query {
 	sql, err := translate(tx.dialect, query, args)
 	return &Query{
 		ctx:    ctx,
@@ -28,7 +28,7 @@ func (tx *Tx) QueryWithContext(ctx context.Context, query string, args ...interf
 }
 
 // Query is a (*DB).Query equivalent for transactions.
-func (tx *Tx) Query(query string, args ...interface{}) *Query {
+func (tx *Tx) Query(query string, args ...any) *Query {
 	return tx.QueryWithContext(context.Background(), query, args...)
 }
 
@@ -43,7 +43,7 @@ func (tx *Tx) Query(query string, args ...interface{}) *Query {
 //
 // The provided context is used for the preparation of the statement, not
 // for the execution of the statement.
-func (tx *Tx) PrepareContext(ctx context.Context, query string, args ...interface{}) (*Stmt, error) {
+func (tx *Tx) PrepareContext(ctx context.Context, query string, args ...any) (*Stmt, error) {
 	sql, err := translatePreparedStmt(tx.dialect, query, args)
 	if err != nil {
 		return nil, err
@@ -63,7 +63,7 @@ func (tx *Tx) PrepareContext(ctx context.Context, query string, args ...interfac
 // Apart of that, ? is the only other placeholder allowed (this one
 // will be transformed into a dialect specific one to allow the parameter
 // binding.
-func (tx *Tx) Prepare(query string, args ...interface{}) (*Stmt, error) {
+func (tx *Tx) Prepare(query string, args ...any) (*Stmt, error) {
 	return tx.PrepareContext(context.Background(), query, args...)
 }
 

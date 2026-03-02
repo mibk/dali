@@ -4,7 +4,7 @@ import "testing"
 
 var transactionTests = []struct {
 	sql      string
-	args     []interface{}
+	args     []any
 	wantSQL  string
 	prepared bool
 }{

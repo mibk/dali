@@ -10,7 +10,7 @@ import (
 
 type FakeDialect struct {
 	cols   []string
-	result []interface{}
+	result []any
 	cur    int
 }
 
@@ -32,7 +32,7 @@ func (d *FakeDialect) SetColumns(cols ...string) *FakeDialect {
 	return d
 }
 
-func (d *FakeDialect) SetResult(result ...interface{}) *FakeDialect {
+func (d *FakeDialect) SetResult(result ...any) *FakeDialect {
 	d.result = result
 	return d
 }

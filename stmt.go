@@ -14,7 +14,7 @@ type Stmt struct {
 
 // BindContext binds args to the prepared statement and returns a Query struct
 // ready to be executed. See (*DB).Query method.
-func (s *Stmt) BindContext(ctx context.Context, args ...interface{}) *Query {
+func (s *Stmt) BindContext(ctx context.Context, args ...any) *Query {
 	return &Query{
 		ctx:    ctx,
 		execer: s.middleware(stmtExecer{s.stmt}),
@@ -25,7 +25,7 @@ func (s *Stmt) BindContext(ctx context.Context, args ...interface{}) *Query {
 
 // Bind binds args to the prepared statement and returns a Query struct
 // ready to be executed. See (*DB).Query method.
-func (s *Stmt) Bind(args ...interface{}) *Query {
+func (s *Stmt) Bind(args ...any) *Query {
 	return s.BindContext(context.Background(), args...)
 }
 
@@ -43,14 +43,14 @@ type stmtExecer struct {
 	stmt *sql.Stmt
 }
 
-func (s stmtExecer) ExecContext(ctx context.Context, _ string, args ...interface{}) (sql.Result, error) {
+func (s stmtExecer) ExecContext(ctx context.Context, _ string, args ...any) (sql.Result, error) {
 	return s.stmt.ExecContext(ctx, args...)
 }
 
-func (s stmtExecer) QueryContext(ctx context.Context, _ string, args ...interface{}) (*sql.Rows, error) {
+func (s stmtExecer) QueryContext(ctx context.Context, _ string, args ...any) (*sql.Rows, error) {
 	return s.stmt.QueryContext(ctx, args...)
 }
 
-func (s stmtExecer) QueryRowContext(ctx context.Context, _ string, args ...interface{}) *sql.Row {
+func (s stmtExecer) QueryRowContext(ctx context.Context, _ string, args ...any) *sql.Row {
 	return s.stmt.QueryRowContext(ctx, args...)
 }

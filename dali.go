@@ -59,7 +59,7 @@ func (db *DB) Ping() error {
 // QueryWithContext is a fundamental method of DB. It returns a Query struct
 // which is capable of executing the sql (given by the query and
 // the args) or loading the result into structs or primitive values.
-func (db *DB) QueryWithContext(ctx context.Context, query string, args ...interface{}) *Query {
+func (db *DB) QueryWithContext(ctx context.Context, query string, args ...any) *Query {
 	sql, err := translate(db.dialect, query, args)
 	return &Query{
 		ctx:    ctx,
@@ -72,7 +72,7 @@ func (db *DB) QueryWithContext(ctx context.Context, query string, args ...interf
 // Query is a fundamental method of DB. It returns a Query struct
 // which is capable of executing the sql (given by the query and
 // the args) or loading the result into structs or primitive values.
-func (db *DB) Query(query string, args ...interface{}) *Query {
+func (db *DB) Query(query string, args ...any) *Query {
 	return db.QueryWithContext(context.Background(), query, args...)
 }
 
@@ -87,7 +87,7 @@ func (db *DB) Query(query string, args ...interface{}) *Query {
 //
 // The provided context is used for the preparation of the statement, not
 // for the execution of the statement.
-func (db *DB) PrepareContext(ctx context.Context, query string, args ...interface{}) (*Stmt, error) {
+func (db *DB) PrepareContext(ctx context.Context, query string, args ...any) (*Stmt, error) {
 	sql, err := translatePreparedStmt(db.dialect, query, args)
 	if err != nil {
 		return nil, err
@@ -107,7 +107,7 @@ func (db *DB) PrepareContext(ctx context.Context, query string, args ...interfac
 // Apart of that, ? is the only other placeholder allowed (this one
 // will be transformed into a dialect specific one to allow the parameter
 // binding.
-func (db *DB) Prepare(query string, args ...interface{}) (*Stmt, error) {
+func (db *DB) Prepare(query string, args ...any) (*Stmt, error) {
 	return db.PrepareContext(context.Background(), query, args...)
 }
 
@@ -149,9 +149,9 @@ func (db *DB) SetMiddlewareFunc(f func(Execer) Execer) {
 
 // Execer is an interface that Query works with.
 type Execer interface {
-	ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error)
-	QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error)
-	QueryRowContext(ctx context.Context, query string, args ...interface{}) *sql.Row
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
+	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
 }
 
 // LastInsertID is a helper that wraps a call to a function returning
@@ -168,4 +168,4 @@ func LastInsertID(res sql.Result, err error) (int64, error) {
 }
 
 // Map is just an alias for map[string]interface{}.
-type Map map[string]interface{}
+type Map map[string]any

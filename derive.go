@@ -22,7 +22,7 @@ func colNamesAndFieldIndexesBase(baseIndex []int, typ reflect.Type, insert bool)
 
 		if f.Type.Kind() == reflect.Struct {
 			switch {
-			case f.Type == reflect.TypeOf(time.Time{}):
+			case f.Type == reflect.TypeFor[time.Time]():
 			case insert && f.Type.Implements(valuerInterface):
 			case !insert && (f.Type.Implements(scannerInterface) || reflect.PtrTo(f.Type).Implements(scannerInterface)):
 				// Known struct.
@@ -53,8 +53,8 @@ func colNamesAndFieldIndexesBase(baseIndex []int, typ reflect.Type, insert bool)
 }
 
 var (
-	valuerInterface  = reflect.TypeOf((*driver.Valuer)(nil)).Elem()
-	scannerInterface = reflect.TypeOf((*sql.Scanner)(nil)).Elem()
+	valuerInterface  = reflect.TypeFor[driver.Valuer]()
+	scannerInterface = reflect.TypeFor[sql.Scanner]()
 )
 
 type fieldProps struct {

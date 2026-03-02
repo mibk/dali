@@ -59,10 +59,10 @@ func TestScanAllRows(t *testing.T) {
 func Test_One_and_All(t *testing.T) {
 	tests := []struct {
 		cols     []string
-		result   []interface{}
-		v        interface{} // value to load
-		method   func(q *Query, dest interface{}) error
-		expected interface{}
+		result   []any
+		v        any // value to load
+		method   func(q *Query, dest any) error
+		expected any
 	}{
 		{
 			cols("ID", "Name"), result(U{2, "Caroline"}, U{3, "Mark"}, U{4, "Lucas"}),
@@ -224,9 +224,9 @@ type VSres struct {
 
 func TestLoading_Types(t *testing.T) {
 	tests := []struct {
-		result   []interface{}
-		v        interface{} // value to load
-		expected interface{}
+		result   []any
+		v        any // value to load
+		expected any
 	}{
 		{result(struct{ A int64 }{-27}), newTypeOf(int64(0)), int64(-27)},
 		{result(struct{ A float64 }{-2.71828}), newTypeOf(float64(0)), float64(-2.71828)},
@@ -238,7 +238,7 @@ func TestLoading_Types(t *testing.T) {
 			sql.NullString{String: "Lucas", Valid: true},
 		},
 		{
-			result(struct{ A interface{} }{nil}), newTypeOf(sql.NullString{}),
+			result(struct{ A any }{nil}), newTypeOf(sql.NullString{}),
 			sql.NullString{},
 		},
 	}
@@ -268,9 +268,9 @@ func TestErrNoRows(t *testing.T) {
 func TestEmptyColumns(t *testing.T) {
 	tests := []struct {
 		cols   []string
-		result []interface{}
-		v      interface{} // value to load
-		method func(q *Query, dest interface{}) error
+		result []any
+		v      any // value to load
+		method func(q *Query, dest any) error
 		expErr string
 	}{
 		{
@@ -296,9 +296,9 @@ func TestEmptyColumns(t *testing.T) {
 	}
 }
 
-func newTypeOf(v interface{}) interface{}   { return reflect.New(reflect.TypeOf(v)).Interface() }
-func cols(s ...string) []string             { return s }
-func result(v ...interface{}) []interface{} { return v }
+func newTypeOf(v any) any       { return reflect.New(reflect.TypeOf(v)).Interface() }
+func cols(s ...string) []string { return s }
+func result(v ...any) []any     { return v }
 
 func BenchmarkLoadingOne(b *testing.B) {
 	dvr.SetColumns("ID", "Name").SetResult(U{1, "John"})

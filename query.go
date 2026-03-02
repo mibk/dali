@@ -12,7 +12,7 @@ type Query struct {
 	ctx    context.Context
 	execer Execer
 	query  string
-	args   []interface{}
+	args   []any
 	err    error
 }
 
@@ -38,7 +38,7 @@ func (q *Query) Rows() (*sql.Rows, error) {
 // pointed at by dest. If more than one row matches the query,
 // ScanRow uses the first row and discards the rest. If no row matches
 // the query, ScanRow returns sql.ErrNoRows.
-func (q *Query) ScanRow(dest ...interface{}) error {
+func (q *Query) ScanRow(dest ...any) error {
 	if q.err != nil {
 		return q.err
 	}

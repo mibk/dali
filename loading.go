@@ -11,9 +11,9 @@ import (
 // Only fields that match the column names (after filtering through
 // the mapperFunc) are filled. One returns sql.ErrNoRows if there are
 // no rows.
-func (q *Query) One(dest interface{}) error {
+func (q *Query) One(dest any) error {
 	destv := reflect.ValueOf(dest)
-	if destv.Kind() != reflect.Ptr {
+	if destv.Kind() != reflect.Pointer {
 		panic("dali: dest must be a pointer to a struct")
 	}
 	v := reflect.Indirect(destv)
@@ -27,10 +27,10 @@ func (q *Query) One(dest interface{}) error {
 // resulting data into dest which must be a slice of structs.
 // Only fields that match the column names (after filtering through
 // the mapperFunc) are filled.
-func (q *Query) All(dest interface{}) error {
+func (q *Query) All(dest any) error {
 	const errMsg = "dali: dest must be a pointer to a slice of structs or pointers to structs"
 	destv := reflect.ValueOf(dest)
-	if destv.Kind() != reflect.Ptr {
+	if destv.Kind() != reflect.Pointer {
 		panic(errMsg)
 	}
 	slicev := reflect.Indirect(destv)
@@ -40,11 +40,11 @@ func (q *Query) All(dest interface{}) error {
 
 	elemt := slicev.Type().Elem()
 	isPtr := false
-	if isPtr = elemt.Kind() == reflect.Ptr; isPtr {
+	if isPtr = elemt.Kind() == reflect.Pointer; isPtr {
 		elemt = elemt.Elem()
 	}
 	switch elemt.Kind() {
-	case reflect.Ptr:
+	case reflect.Pointer:
 		panic("dali: a pointer to a pointer is not allowed as an element of dest")
 	case reflect.Struct:
 		return q.loadStructs(slicev, elemt, isPtr)
@@ -87,7 +87,7 @@ func (q *Query) load(v reflect.Value, elemt reflect.Type, loadJustOne, isPtr boo
 		}
 		fieldIndexes[coln] = index
 	}
-	fields := make([]interface{}, len(fieldIndexes))
+	fields := make([]any, len(fieldIndexes))
 
 	noRows := true
 	for rows.Next() {
@@ -98,7 +98,7 @@ func (q *Query) load(v reflect.Value, elemt reflect.Type, loadJustOne, isPtr boo
 		noMatch := true
 		for i, index := range fieldIndexes {
 			if index == nil {
-				fields[i] = new(interface{})
+				fields[i] = new(any)
 				continue
 			}
 			noMatch = false
@@ -135,12 +135,12 @@ func (q *Query) load(v reflect.Value, elemt reflect.Type, loadJustOne, isPtr boo
 // ScanAllRows executes the query that is expected to return rows.
 // It copies the columns from the matched rows into the slices
 // pointed at by dests.
-func (q *Query) ScanAllRows(dests ...interface{}) error {
+func (q *Query) ScanAllRows(dests ...any) error {
 	slicevals := make([]reflect.Value, len(dests))
 	elemtypes := make([]reflect.Type, len(dests))
 	for i, dests := range dests {
 		destv := reflect.ValueOf(dests)
-		if destv.Kind() != reflect.Ptr {
+		if destv.Kind() != reflect.Pointer {
 			panic("dali: dests must be a pointer to a slice")
 		}
 		slicevals[i] = reflect.Indirect(destv)
@@ -155,7 +155,7 @@ func (q *Query) ScanAllRows(dests ...interface{}) error {
 	}
 	defer rows.Close()
 	elemvptrs := make([]reflect.Value, len(dests))
-	args := make([]interface{}, len(dests))
+	args := make([]any, len(dests))
 	noRows := true
 	for rows.Next() {
 		noRows = false
