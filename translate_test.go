@@ -10,6 +10,7 @@ import (
 )
 
 type MyString string
+type MyTime time.Time
 
 func strPtr(s string) *string {
 	return &s
@@ -351,6 +352,7 @@ var typesTests = []struct {
 	},
 	{"?", Args{[]byte("binary text")}, "`binary text`"},
 	{"?", Args{sometime}, "'2015-03-05 10:42:43 +0000 UTC'"},
+	{"?", Args{MyTime(sometime)}, "'2015-03-05 10:42:43 +0000 UTC'"},
 
 	// NULL
 	{

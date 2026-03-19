@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
+	"time"
 )
 
 var (
@@ -135,6 +136,12 @@ func Test_One_and_All(t *testing.T) {
 			[]Omit{{1, "Barbora", 19}, {4, "Bob", 23}},
 		},
 		{
+			"One/time_derived_type",
+			cols("Event", "Started"), result(MyTimeStructRes{"Lunch", parseTime("2015-05-05 12:24:32")}),
+			newTypeOf(MyTimeStruct{}), (*Query).One,
+			MyTimeStruct{"Lunch", MyTime(parseTime("2015-05-05 12:24:32"))},
+		},
+		{
 			"All/selectonly_custom_col",
 			cols("Id_user", "Name", "Age"), result(Omit2res{1, "Hubert", 32}, Omit2res{4, "Bob", 23}),
 			newTypeOf([]Omit2{}), (*Query).All,
@@ -228,6 +235,16 @@ type VSres struct {
 	A    int
 	B    int
 	Scan string
+}
+
+type MyTimeStruct struct {
+	Event   string
+	Started MyTime
+}
+
+type MyTimeStructRes struct {
+	Event   string
+	Started time.Time
 }
 
 func TestLoading_Types(t *testing.T) {
