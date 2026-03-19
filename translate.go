@@ -248,8 +248,8 @@ func (p *Translator) escapeValue(b *bytes.Buffer, v interface{}) error {
 		}
 		return fmt.Errorf("only a slice of bytes supported; got: %T", v)
 	case reflect.Struct:
-		if vv.Type() == timeType {
-			p.dialect.EscapeTime(b, vv.Interface().(time.Time))
+		if vv.Type().ConvertibleTo(timeType) {
+			p.dialect.EscapeTime(b, vv.Convert(timeType).Interface().(time.Time))
 			break
 		}
 		fallthrough

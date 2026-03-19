@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
+	"time"
 )
 
 var (
@@ -114,6 +115,12 @@ func Test_One_and_All(t *testing.T) {
 			newTypeOf([]Omit2{}), (*Query).All,
 			[]Omit2{{1, "Hubert", 32}, {4, "Bob", 23}},
 		},
+
+		// time-derived type
+		{cols("Event", "Started"), result(MyTimeStructRes{"Lunch", parseTime("2015-05-05 12:24:32")}),
+			newTypeOf(MyTimeStruct{}), (*Query).One,
+			MyTimeStruct{"Lunch", MyTime(parseTime("2015-05-05 12:24:32"))},
+		},
 	}
 
 	for _, tt := range tests {
@@ -166,6 +173,16 @@ type VSres struct {
 	A    int
 	B    int
 	Scan string
+}
+
+type MyTimeStruct struct {
+	Event   string
+	Started MyTime
+}
+
+type MyTimeStructRes struct {
+	Event   string
+	Started time.Time
 }
 
 func TestLoading_Types(t *testing.T) {
