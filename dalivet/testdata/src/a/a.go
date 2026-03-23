@@ -133,6 +133,14 @@ func checkGuardedBailout(db *dali.DB) {
 	db.Query("SELECT ?...", items) // OK
 }
 
+func checkGuardedBailoutPanic(db *dali.DB) {
+	items := []int{1, 2}
+	if len(items) == 0 {
+		panic("unreachable")
+	}
+	db.Query("SELECT ?...", items) // OK
+}
+
 func checkGuardedPositive(db *dali.DB) {
 	items := []int{1, 2}
 	if len(items) > 0 {

@@ -753,9 +753,15 @@ func blockTerminates(block *ast.BlockStmt) bool {
 		return false
 	}
 	last := block.List[len(block.List)-1]
-	switch last.(type) {
+	switch s := last.(type) {
 	case *ast.ReturnStmt, *ast.BranchStmt:
 		return true
+	case *ast.ExprStmt:
+		if call, ok := s.X.(*ast.CallExpr); ok {
+			if fn, ok := call.Fun.(*ast.Ident); ok && fn.Name == "panic" {
+				return true
+			}
+		}
 	}
 	return false
 }
