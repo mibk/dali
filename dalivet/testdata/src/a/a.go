@@ -110,6 +110,13 @@ func checkPrepareRestrictions(db *dali.DB) {
 	db.Prepare("UPDATE ?set WHERE x = ?", User{})         // want `\?set cannot be used in prepared statements`
 }
 
+func checkEmptySliceLiteral(db *dali.DB) {
+	db.Query("SELECT ?...", []int{})         // want `empty slice passed to \?\.\.\.`
+	db.Query("SELECT ?ident...", []string{}) // want `empty slice passed to \?ident\.\.\.`
+	db.Query("SELECT ?values...", []User{})  // want `empty slice passed to \?values\.\.\.`
+	db.Query("SELECT ?...", []int{1})        // OK
+}
+
 func checkValuer(db *dali.DB) {
 	var v Valuer
 	db.Query("SELECT ?", v) // OK: implements driver.Valuer

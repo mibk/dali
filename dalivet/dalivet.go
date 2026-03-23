@@ -249,9 +249,15 @@ func (c *checker) checkDBTxMethods(call *ast.CallExpr, method, typeName string) 
 		if argIdx >= len(call.Args) {
 			break
 		}
-		argType := c.pass.TypesInfo.TypeOf(call.Args[argIdx])
+		arg := call.Args[argIdx]
+		if ph.Expand {
+			if lit, ok := arg.(*ast.CompositeLit); ok && len(lit.Elts) == 0 {
+				c.pass.Reportf(arg.Pos(), "empty slice passed to ?%s...", ph.Type)
+			}
+		}
+		argType := c.pass.TypesInfo.TypeOf(arg)
 		if !isInterface(argType) {
-			c.checkPlaceholderType(call.Args[argIdx], ph, argType)
+			c.checkPlaceholderType(arg, ph, argType)
 		}
 		argIdx++
 	}
