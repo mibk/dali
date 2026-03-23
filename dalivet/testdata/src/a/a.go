@@ -290,3 +290,32 @@ func checkUnguardedDerived(db *dali.DB) {
 	ids := slices.Sorted(maps.Keys(m))
 	db.Query("SELECT ?...", ids) // want `slice "ids" passed to \?\.\.\. without a length check`
 }
+
+func checkGuardedDerivedViaMapPopulation(db *dali.DB) {
+	items := []int{1, 2}
+	if len(items) == 0 {
+		return
+	}
+	dedup := make(map[int]bool)
+	for _, v := range items {
+		dedup[v] = true
+	}
+	ids := slices.Sorted(maps.Keys(dedup))
+	db.Query("SELECT ?...", ids) // OK
+}
+
+func checkGuardedDerivedViaMapPopulationClosure(db *dali.DB) {
+	items := []int{1, 2}
+	if len(items) == 0 {
+		return
+	}
+	f := func() {
+		dedup := make(map[int]bool)
+		for _, v := range items {
+			dedup[v] = true
+		}
+		ids := slices.Sorted(maps.Keys(dedup))
+		db.Query("SELECT ?...", ids) // OK
+	}
+	f()
+}

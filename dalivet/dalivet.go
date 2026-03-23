@@ -545,9 +545,69 @@ func traceSliceSource(stmts []ast.Stmt, name string) string {
 //   - Transitive:  x built via append inside for range Y, where Y is guarded
 //   - Make(len):   x := make([]T, len(Y)), where Y is guarded
 //   - Derived:     x := slices.Sorted(maps.Keys(m)) inside if len(m) > 0
-func isSliceGuarded(stack []ast.Node, ident *ast.Ident) bool {
-	name := ident.Name
+// traceNonEmptySource scans stmts (up to but not including before) for a
+// statement that establishes name's non-emptiness from some source variable.
+// Returns that source's name or "".
+//
+// Recognized patterns:
+//   - name := f(g(h(x))) where f,g,h are non-empty-preserving stdlib calls
+//   - for _, v := range X { name[k] = v } (map population)
+//   - for _, v := range X { name = append(name, ...) } (slice population)
+func traceNonEmptySource(stmts []ast.Stmt, before ast.Node, name string) string {
+	for _, stmt := range stmts {
+		if stmt == before {
+			break
+		}
+		switch s := stmt.(type) {
+		case *ast.AssignStmt:
+			if len(s.Lhs) != 1 || len(s.Rhs) != 1 {
+				continue
+			}
+			lhs, ok := s.Lhs[0].(*ast.Ident)
+			if !ok || lhs.Name != name {
+				continue
+			}
+			if src := traceCallSource(s.Rhs[0]); src != "" {
+				return src
+			}
+		case *ast.RangeStmt:
+			rangeIdent, ok := s.X.(*ast.Ident)
+			if !ok {
+				continue
+			}
+			if bodyAppendsTo(s.Body, name) || bodyWritesMapEntry(s.Body, name) {
+				return rangeIdent.Name
+			}
+		}
+	}
+	return ""
+}
 
+// bodyWritesMapEntry reports whether body contains a statement of the form
+// name[k] = v (map index assignment).
+func bodyWritesMapEntry(body *ast.BlockStmt, name string) bool {
+	for _, stmt := range body.List {
+		assign, ok := stmt.(*ast.AssignStmt)
+		if !ok || len(assign.Lhs) != 1 {
+			continue
+		}
+		idx, ok := assign.Lhs[0].(*ast.IndexExpr)
+		if !ok {
+			continue
+		}
+		id, ok := idx.X.(*ast.Ident)
+		if ok && id.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
+func isSliceGuarded(stack []ast.Node, ident *ast.Ident) bool {
+	return isSliceNameGuarded(stack, ident.Name)
+}
+
+func isSliceNameGuarded(stack []ast.Node, name string) bool {
 	// Pattern B: call inside if len(x) > 0 { ... } (positive guard).
 	// The len check may be one conjunct in a && chain.
 	// Extended: if the direct name doesn't match, trace the source of
@@ -581,6 +641,26 @@ func isSliceGuarded(stack []ast.Node, ident *ast.Ident) bool {
 		callStmt := stack[i+1]
 		if blockGuardsSlice(block, callStmt, name) {
 			return true
+		}
+	}
+
+	// Trace non-empty source: if name is derived (via non-empty-preserving
+	// calls or for-range population) from some other variable, recursively
+	// check whether that source is guarded. This uses the full stack so it
+	// works across closure boundaries.
+	for i := len(stack) - 1; i >= 0; i-- {
+		block, ok := stack[i].(*ast.BlockStmt)
+		if !ok {
+			continue
+		}
+		if i+1 >= len(stack) {
+			continue
+		}
+		callStmt := stack[i+1]
+		if src := traceNonEmptySource(block.List, callStmt, name); src != "" {
+			if isSliceNameGuarded(stack, src) {
+				return true
+			}
 		}
 	}
 	return false
