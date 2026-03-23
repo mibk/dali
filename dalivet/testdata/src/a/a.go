@@ -193,6 +193,27 @@ func checkUnguardedTransitiveRange(db *dali.DB) {
 	db.Query("SELECT ?...", ids) // want `slice "ids" passed to \?\.\.\. without a length check`
 }
 
+func checkGuardedMakeLen(db *dali.DB) {
+	items := []int{1, 2}
+	if len(items) == 0 {
+		return
+	}
+	ids := make([]int64, len(items))
+	for i, v := range items {
+		ids[i] = int64(v)
+	}
+	db.Query("SELECT ?...", ids) // OK
+}
+
+func checkUnguardedMakeLen(db *dali.DB) {
+	items := []int{1, 2}
+	ids := make([]int64, len(items))
+	for i, v := range items {
+		ids[i] = int64(v)
+	}
+	db.Query("SELECT ?...", ids) // want `slice "ids" passed to \?\.\.\. without a length check`
+}
+
 func checkValuer(db *dali.DB) {
 	var v Valuer
 	db.Query("SELECT ?", v) // OK: implements driver.Valuer

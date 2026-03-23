@@ -476,11 +476,13 @@ func implementsValuer(t types.Type) bool {
 }
 
 // isSliceGuarded reports whether ident is guarded by a length check in the
-// surrounding code. It recognizes three patterns:
+// surrounding code. It recognizes these patterns:
 //
-//   - Bail-out: if len(x) == 0 { return } preceding the call in the same block
-//   - Default:  if len(x) == 0 { x = fallback } preceding the call
-//   - Positive: the call is inside if len(x) > 0 { ... }
+//   - Bail-out:    if len(x) == 0 { return } preceding the call in the same block
+//   - Default:     if len(x) == 0 { x = fallback } preceding the call
+//   - Positive:    the call is inside if len(x) > 0 { ... }
+//   - Transitive:  x built via append inside for range Y, where Y is guarded
+//   - Make(len):   x := make([]T, len(Y)), where Y is guarded
 func isSliceGuarded(stack []ast.Node, ident *ast.Ident) bool {
 	name := ident.Name
 
@@ -518,23 +520,29 @@ func isSliceGuarded(stack []ast.Node, ident *ast.Ident) bool {
 
 	// Pattern C: name is appended to inside for range X, and X has a
 	// bail-out guard earlier in the block.
+	// Pattern D: name := make([]T, len(X)) and X has a bail-out guard.
 	for _, stmt := range block.List {
 		if stmt == callStmt {
 			break
 		}
-		rangeStmt, ok := stmt.(*ast.RangeStmt)
-		if !ok {
-			continue
-		}
-		rangeIdent, ok := rangeStmt.X.(*ast.Ident)
-		if !ok {
-			continue
-		}
-		if !bodyAppendsTo(rangeStmt.Body, name) {
-			continue
-		}
-		if hasBailoutGuard(block.List, stmt, rangeIdent.Name) {
-			return true
+		switch s := stmt.(type) {
+		case *ast.RangeStmt:
+			rangeIdent, ok := s.X.(*ast.Ident)
+			if !ok {
+				continue
+			}
+			if !bodyAppendsTo(s.Body, name) {
+				continue
+			}
+			if hasBailoutGuard(block.List, s, rangeIdent.Name) {
+				return true
+			}
+		case *ast.AssignStmt:
+			if src := makeLenSource(s, name); src != "" {
+				if hasBailoutGuard(block.List, s, src) {
+					return true
+				}
+			}
 		}
 	}
 	return false
@@ -593,6 +601,39 @@ func bodyAppendsTo(body *ast.BlockStmt, name string) bool {
 		return true
 	}
 	return false
+}
+
+// makeLenSource checks whether assign is of the form name = make([]T, len(X))
+// or name := make([]T, len(X)), and returns X's name if so. Otherwise "".
+func makeLenSource(assign *ast.AssignStmt, name string) string {
+	if len(assign.Lhs) != 1 || len(assign.Rhs) != 1 {
+		return ""
+	}
+	lhs, ok := assign.Lhs[0].(*ast.Ident)
+	if !ok || lhs.Name != name {
+		return ""
+	}
+	call, ok := assign.Rhs[0].(*ast.CallExpr)
+	if !ok || len(call.Args) < 2 {
+		return ""
+	}
+	fn, ok := call.Fun.(*ast.Ident)
+	if !ok || fn.Name != "make" {
+		return ""
+	}
+	lenCall, ok := call.Args[1].(*ast.CallExpr)
+	if !ok {
+		return ""
+	}
+	lenFn, ok := lenCall.Fun.(*ast.Ident)
+	if !ok || lenFn.Name != "len" || len(lenCall.Args) != 1 {
+		return ""
+	}
+	src, ok := lenCall.Args[0].(*ast.Ident)
+	if !ok {
+		return ""
+	}
+	return src.Name
 }
 
 // matchLenCheck matches expressions of the form len(name) <op> <int> or
