@@ -5,7 +5,9 @@ package dalivet
 import (
 	"go/ast"
 	"go/constant"
+	"go/token"
 	"go/types"
+	"strconv"
 
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/inspect"
@@ -35,32 +37,35 @@ func run(pass *analysis.Pass) (any, error) {
 		(*ast.CallExpr)(nil),
 	}
 
-	insp.Preorder(nodeFilter, func(n ast.Node) {
+	insp.WithStack(nodeFilter, func(n ast.Node, push bool, stack []ast.Node) bool {
+		if !push {
+			return true
+		}
 		call := n.(*ast.CallExpr)
 		sel, ok := call.Fun.(*ast.SelectorExpr)
 		if !ok {
-			return
+			return true
 		}
 
 		obj := pass.TypesInfo.ObjectOf(sel.Sel)
 		fn, ok := obj.(*types.Func)
 		if !ok {
-			return
+			return true
 		}
 
 		recv := fn.Type().(*types.Signature).Recv()
 		if recv == nil {
-			return
+			return true
 		}
 
 		recvType := derefType(recv.Type())
 		named, ok := recvType.(*types.Named)
 		if !ok {
-			return
+			return true
 		}
 		namedObj := named.Obj()
 		if namedObj.Pkg() == nil || namedObj.Pkg().Path() != daliPkg {
-			return
+			return true
 		}
 
 		typeName := namedObj.Name()
@@ -70,8 +75,9 @@ func run(pass *analysis.Pass) (any, error) {
 		case "Query":
 			c.checkQueryMethods(call, methodName)
 		case "DB", "Tx":
-			c.checkDBTxMethods(call, methodName, typeName)
+			c.checkDBTxMethods(call, methodName, typeName, stack)
 		}
+		return true
 	})
 
 	return nil, nil
@@ -164,7 +170,7 @@ func (c *checker) checkScanAllRowsArg(arg ast.Expr) {
 }
 
 // checkDBTxMethods handles Checks 2-4 for Query/Prepare methods.
-func (c *checker) checkDBTxMethods(call *ast.CallExpr, method, typeName string) {
+func (c *checker) checkDBTxMethods(call *ast.CallExpr, method, typeName string, stack []ast.Node) {
 	var isPrepare bool
 	var queryArgIdx int
 	switch method {
@@ -251,8 +257,16 @@ func (c *checker) checkDBTxMethods(call *ast.CallExpr, method, typeName string) 
 		}
 		arg := call.Args[argIdx]
 		if ph.Expand {
-			if lit, ok := arg.(*ast.CompositeLit); ok && len(lit.Elts) == 0 {
-				c.pass.Reportf(arg.Pos(), "empty slice passed to ?%s...", ph.Type)
+			switch a := arg.(type) {
+			case *ast.CompositeLit:
+				if len(a.Elts) == 0 {
+					c.pass.Reportf(arg.Pos(), "empty slice passed to ?%s...", ph.Type)
+				}
+			case *ast.Ident:
+				if !isSliceGuarded(stack, a) {
+					c.pass.Reportf(arg.Pos(),
+						"slice %q passed to ?%s... without a length check", a.Name, ph.Type)
+				}
 			}
 		}
 		argType := c.pass.TypesInfo.TypeOf(arg)
@@ -459,6 +473,148 @@ func implementsMarshaler(t types.Type) bool {
 
 func implementsValuer(t types.Type) bool {
 	return hasMethod(t, "Value", 0, 2)
+}
+
+// isSliceGuarded reports whether ident is guarded by a length check in the
+// surrounding code. It recognizes two patterns:
+//
+//   - Bail-out: if len(x) == 0 { return } preceding the call in the same block
+//   - Positive: the call is inside if len(x) > 0 { ... }
+func isSliceGuarded(stack []ast.Node, ident *ast.Ident) bool {
+	name := ident.Name
+
+	// Pattern B: call inside if len(x) > 0 { ... } (positive guard).
+	for i := len(stack) - 1; i >= 0; i-- {
+		ifStmt, ok := stack[i].(*ast.IfStmt)
+		if !ok {
+			continue
+		}
+		op, val, ok := matchLenCheck(ifStmt.Cond, name)
+		if !ok {
+			continue
+		}
+		if isPositiveGuard(op, val) {
+			return true
+		}
+	}
+
+	// Pattern A: bail-out preceding the call in the same block.
+	// Find the nearest enclosing BlockStmt and the statement containing the call.
+	var block *ast.BlockStmt
+	var callStmt ast.Node
+	for i := len(stack) - 1; i >= 0; i-- {
+		if b, ok := stack[i].(*ast.BlockStmt); ok {
+			block = b
+			if i+1 < len(stack) {
+				callStmt = stack[i+1]
+			}
+			break
+		}
+	}
+	if block == nil || callStmt == nil {
+		return false
+	}
+	for _, stmt := range block.List {
+		if stmt == callStmt {
+			break
+		}
+		ifStmt, ok := stmt.(*ast.IfStmt)
+		if !ok {
+			continue
+		}
+		op, val, ok := matchLenCheck(ifStmt.Cond, name)
+		if !ok {
+			continue
+		}
+		if isZeroGuard(op, val) && blockTerminates(ifStmt.Body) {
+			return true
+		}
+	}
+	return false
+}
+
+// matchLenCheck matches expressions of the form len(name) <op> <int> or
+// <int> <op> len(name), returning the operator (normalized so len is on the
+// left) and the integer value.
+func matchLenCheck(expr ast.Expr, name string) (token.Token, int64, bool) {
+	bin, ok := expr.(*ast.BinaryExpr)
+	if !ok {
+		return 0, 0, false
+	}
+
+	lenOnLeft := isLenCall(bin.X, name)
+	lenOnRight := isLenCall(bin.Y, name)
+	if !lenOnLeft && !lenOnRight {
+		return 0, 0, false
+	}
+
+	var litSide ast.Expr
+	op := bin.Op
+	if lenOnLeft {
+		litSide = bin.Y
+	} else {
+		litSide = bin.X
+		// Normalize: flip operator so len is conceptually on the left.
+		switch op {
+		case token.LSS:
+			op = token.GTR
+		case token.GTR:
+			op = token.LSS
+		case token.LEQ:
+			op = token.GEQ
+		case token.GEQ:
+			op = token.LEQ
+		}
+	}
+
+	lit, ok := litSide.(*ast.BasicLit)
+	if !ok || lit.Kind != token.INT {
+		return 0, 0, false
+	}
+	val, err := strconv.ParseInt(lit.Value, 10, 64)
+	if err != nil {
+		return 0, 0, false
+	}
+	return op, val, true
+}
+
+func isLenCall(expr ast.Expr, name string) bool {
+	call, ok := expr.(*ast.CallExpr)
+	if !ok || len(call.Args) != 1 {
+		return false
+	}
+	fn, ok := call.Fun.(*ast.Ident)
+	if !ok || fn.Name != "len" {
+		return false
+	}
+	arg, ok := call.Args[0].(*ast.Ident)
+	return ok && arg.Name == name
+}
+
+// isZeroGuard returns true if the condition means "length is zero":
+// len(x) == 0 or len(x) < 1.
+func isZeroGuard(op token.Token, val int64) bool {
+	return (op == token.EQL && val == 0) || (op == token.LSS && val == 1)
+}
+
+// isPositiveGuard returns true if the condition means "length is positive":
+// len(x) > 0, len(x) != 0, or len(x) >= 1.
+func isPositiveGuard(op token.Token, val int64) bool {
+	return (op == token.GTR && val == 0) ||
+		(op == token.NEQ && val == 0) ||
+		(op == token.GEQ && val == 1)
+}
+
+func blockTerminates(block *ast.BlockStmt) bool {
+	if len(block.List) == 0 {
+		return false
+	}
+	last := block.List[len(block.List)-1]
+	switch last.(type) {
+	case *ast.ReturnStmt, *ast.BranchStmt:
+		return true
+	}
+	return false
 }
 
 func hasMethod(t types.Type, name string, params, results int) bool {

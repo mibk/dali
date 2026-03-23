@@ -117,6 +117,44 @@ func checkEmptySliceLiteral(db *dali.DB) {
 	db.Query("SELECT ?...", []int{1})        // OK
 }
 
+func checkUnguardedSlice(db *dali.DB) {
+	items := []int{1, 2}
+	db.Query("SELECT ?...", items) // want `slice "items" passed to \?\.\.\. without a length check`
+
+	idents := []string{"a"}
+	db.Query("SELECT ?ident...", idents) // want `slice "idents" passed to \?ident\.\.\. without a length check`
+}
+
+func checkGuardedBailout(db *dali.DB) {
+	items := []int{1, 2}
+	if len(items) == 0 {
+		return
+	}
+	db.Query("SELECT ?...", items) // OK
+}
+
+func checkGuardedPositive(db *dali.DB) {
+	items := []int{1, 2}
+	if len(items) > 0 {
+		db.Query("SELECT ?...", items) // OK
+	}
+}
+
+func checkGuardedNotEqual(db *dali.DB) {
+	items := []int{1, 2}
+	if len(items) != 0 {
+		db.Query("SELECT ?...", items) // OK
+	}
+}
+
+func checkGuardedLessThanOne(db *dali.DB) {
+	items := []int{1, 2}
+	if len(items) < 1 {
+		return
+	}
+	db.Query("SELECT ?...", items) // OK
+}
+
 func checkValuer(db *dali.DB) {
 	var v Valuer
 	db.Query("SELECT ?", v) // OK: implements driver.Valuer
