@@ -496,7 +496,6 @@ func isSliceGuarded(stack []ast.Node, ident *ast.Ident) bool {
 		}
 	}
 
-	// Pattern A: bail-out or default-value preceding the call in the same block.
 	// Find the nearest enclosing BlockStmt and the statement containing the call.
 	var block *ast.BlockStmt
 	var callStmt ast.Node
@@ -512,8 +511,41 @@ func isSliceGuarded(stack []ast.Node, ident *ast.Ident) bool {
 	if block == nil || callStmt == nil {
 		return false
 	}
+	// Pattern A: bail-out or default-value preceding the call in the same block.
+	if hasBailoutGuard(block.List, callStmt, name) {
+		return true
+	}
+
+	// Pattern C: name is appended to inside for range X, and X has a
+	// bail-out guard earlier in the block.
 	for _, stmt := range block.List {
 		if stmt == callStmt {
+			break
+		}
+		rangeStmt, ok := stmt.(*ast.RangeStmt)
+		if !ok {
+			continue
+		}
+		rangeIdent, ok := rangeStmt.X.(*ast.Ident)
+		if !ok {
+			continue
+		}
+		if !bodyAppendsTo(rangeStmt.Body, name) {
+			continue
+		}
+		if hasBailoutGuard(block.List, stmt, rangeIdent.Name) {
+			return true
+		}
+	}
+	return false
+}
+
+// hasBailoutGuard reports whether stmts (up to, not including, before)
+// contains an if statement whose condition is a zero-length guard on name
+// and whose body terminates or assigns a default value to name.
+func hasBailoutGuard(stmts []ast.Stmt, before ast.Node, name string) bool {
+	for _, stmt := range stmts {
+		if stmt == before {
 			break
 		}
 		ifStmt, ok := stmt.(*ast.IfStmt)
@@ -527,6 +559,38 @@ func isSliceGuarded(stack []ast.Node, ident *ast.Ident) bool {
 		if isZeroGuard(op, val) && (blockTerminates(ifStmt.Body) || blockAssigns(ifStmt.Body, name)) {
 			return true
 		}
+	}
+	return false
+}
+
+// bodyAppendsTo reports whether body contains a top-level assignment of the
+// form name = append(name, ...).
+func bodyAppendsTo(body *ast.BlockStmt, name string) bool {
+	for _, stmt := range body.List {
+		assign, ok := stmt.(*ast.AssignStmt)
+		if !ok || len(assign.Lhs) != 1 || len(assign.Rhs) != 1 {
+			continue
+		}
+		lhs, ok := assign.Lhs[0].(*ast.Ident)
+		if !ok || lhs.Name != name {
+			continue
+		}
+		call, ok := assign.Rhs[0].(*ast.CallExpr)
+		if !ok {
+			continue
+		}
+		fn, ok := call.Fun.(*ast.Ident)
+		if !ok || fn.Name != "append" {
+			continue
+		}
+		if len(call.Args) < 1 {
+			continue
+		}
+		first, ok := call.Args[0].(*ast.Ident)
+		if !ok || first.Name != name {
+			continue
+		}
+		return true
 	}
 	return false
 }

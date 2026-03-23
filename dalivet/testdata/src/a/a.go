@@ -172,6 +172,27 @@ func checkGuardedLessThanOne(db *dali.DB) {
 	db.Query("SELECT ?...", items) // OK
 }
 
+func checkGuardedTransitiveRange(db *dali.DB) {
+	items := []int{1, 2}
+	if len(items) == 0 {
+		return
+	}
+	var ids []int64
+	for _, i := range items {
+		ids = append(ids, int64(i))
+	}
+	db.Query("SELECT ?...", ids) // OK
+}
+
+func checkUnguardedTransitiveRange(db *dali.DB) {
+	items := []int{1, 2}
+	var ids []int64
+	for _, i := range items {
+		ids = append(ids, int64(i))
+	}
+	db.Query("SELECT ?...", ids) // want `slice "ids" passed to \?\.\.\. without a length check`
+}
+
 func checkValuer(db *dali.DB) {
 	var v Valuer
 	db.Query("SELECT ?", v) // OK: implements driver.Valuer
