@@ -319,3 +319,16 @@ func checkGuardedDerivedViaMapPopulationClosure(db *dali.DB) {
 	}
 	f()
 }
+
+func checkGuardedDerivedViaSelectorRangeMapChain(db *dali.DB) {
+	var v struct{ Items []int }
+	if len(v.Items) == 0 {
+		return
+	}
+	dedup := make(map[int]bool)
+	for _, x := range v.Items {
+		dedup[x] = true
+	}
+	ids := slices.Sorted(maps.Keys(dedup))
+	db.Query("SELECT ?...", ids) // OK
+}

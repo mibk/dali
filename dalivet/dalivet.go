@@ -571,12 +571,12 @@ func traceNonEmptySource(stmts []ast.Stmt, before ast.Node, name string) string 
 				return src
 			}
 		case *ast.RangeStmt:
-			rangeIdent, ok := s.X.(*ast.Ident)
-			if !ok {
+			src := exprName(s.X)
+			if src == "" {
 				continue
 			}
 			if bodyAppendsTo(s.Body, name) || bodyWritesMapEntry(s.Body, name) {
-				return rangeIdent.Name
+				return src
 			}
 		}
 	}
@@ -683,14 +683,14 @@ func blockGuardsSlice(block *ast.BlockStmt, callStmt ast.Node, name string) bool
 		}
 		switch s := stmt.(type) {
 		case *ast.RangeStmt:
-			rangeIdent, ok := s.X.(*ast.Ident)
-			if !ok {
+			src := exprName(s.X)
+			if src == "" {
 				continue
 			}
 			if !bodyAppendsTo(s.Body, name) {
 				continue
 			}
-			if hasBailoutGuard(block.List, s, rangeIdent.Name) {
+			if hasBailoutGuard(block.List, s, src) {
 				return true
 			}
 		case *ast.AssignStmt:
@@ -859,8 +859,21 @@ func isLenCall(expr ast.Expr, name string) bool {
 	if !ok || fn.Name != "len" {
 		return false
 	}
-	arg, ok := call.Args[0].(*ast.Ident)
-	return ok && arg.Name == name
+	return exprName(call.Args[0]) == name
+}
+
+// exprName returns a string representation for simple name expressions:
+// plain identifiers ("x") and one-level selectors ("v.Payments").
+func exprName(expr ast.Expr) string {
+	switch e := expr.(type) {
+	case *ast.Ident:
+		return e.Name
+	case *ast.SelectorExpr:
+		if x, ok := e.X.(*ast.Ident); ok {
+			return x.Name + "." + e.Sel.Name
+		}
+	}
+	return ""
 }
 
 // isZeroGuard returns true if the condition means "length is zero":
