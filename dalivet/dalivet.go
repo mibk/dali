@@ -475,6 +475,66 @@ func implementsValuer(t types.Type) bool {
 	return hasMethod(t, "Value", 0, 2)
 }
 
+// nonEmptyPreserving lists stdlib functions that preserve the non-emptiness
+// of their first argument: if the input is non-empty, the output is non-empty.
+var nonEmptyPreserving = map[string]map[string]bool{
+	"slices": {
+		"Sorted": true, "SortedFunc": true, "SortedStableFunc": true,
+		"Compact": true, "CompactFunc": true, "Clip": true,
+		"Clone": true, "Collect": true,
+	},
+	"maps": {"Keys": true, "Values": true, "Collect": true},
+}
+
+// traceCallSource peels nested calls to known non-empty-preserving stdlib
+// functions and returns the innermost identifier name. For example, given
+// slices.Sorted(maps.Keys(m)) it returns "m".
+func traceCallSource(expr ast.Expr) string {
+	for {
+		call, ok := expr.(*ast.CallExpr)
+		if !ok {
+			break
+		}
+		sel, ok := call.Fun.(*ast.SelectorExpr)
+		if !ok || len(call.Args) == 0 {
+			return ""
+		}
+		pkg, ok := sel.X.(*ast.Ident)
+		if !ok {
+			return ""
+		}
+		funcs, ok := nonEmptyPreserving[pkg.Name]
+		if !ok || !funcs[sel.Sel.Name] {
+			return ""
+		}
+		expr = call.Args[0]
+	}
+	if id, ok := expr.(*ast.Ident); ok {
+		return id.Name
+	}
+	return ""
+}
+
+// traceSliceSource scans stmts for an assignment to name whose RHS traces
+// (via traceCallSource) to a source identifier. Returns that identifier's
+// name or "".
+func traceSliceSource(stmts []ast.Stmt, name string) string {
+	for _, stmt := range stmts {
+		assign, ok := stmt.(*ast.AssignStmt)
+		if !ok || len(assign.Lhs) != 1 || len(assign.Rhs) != 1 {
+			continue
+		}
+		lhs, ok := assign.Lhs[0].(*ast.Ident)
+		if !ok || lhs.Name != name {
+			continue
+		}
+		if src := traceCallSource(assign.Rhs[0]); src != "" {
+			return src
+		}
+	}
+	return ""
+}
+
 // isSliceGuarded reports whether ident is guarded by a length check in the
 // surrounding code. It walks enclosing blocks outward (including through
 // closure boundaries) and recognizes these patterns:
@@ -484,11 +544,14 @@ func implementsValuer(t types.Type) bool {
 //   - Positive:    the call is inside if len(x) > 0 { ... }
 //   - Transitive:  x built via append inside for range Y, where Y is guarded
 //   - Make(len):   x := make([]T, len(Y)), where Y is guarded
+//   - Derived:     x := slices.Sorted(maps.Keys(m)) inside if len(m) > 0
 func isSliceGuarded(stack []ast.Node, ident *ast.Ident) bool {
 	name := ident.Name
 
 	// Pattern B: call inside if len(x) > 0 { ... } (positive guard).
 	// The len check may be one conjunct in a && chain.
+	// Extended: if the direct name doesn't match, trace the source of
+	// name from the if body and re-check.
 	for i := len(stack) - 1; i >= 0; i-- {
 		ifStmt, ok := stack[i].(*ast.IfStmt)
 		if !ok {
@@ -496,6 +559,11 @@ func isSliceGuarded(stack []ast.Node, ident *ast.Ident) bool {
 		}
 		if condHasPositiveLenGuard(ifStmt.Cond, name) {
 			return true
+		}
+		if src := traceSliceSource(ifStmt.Body.List, name); src != "" {
+			if condHasPositiveLenGuard(ifStmt.Cond, src) {
+				return true
+			}
 		}
 	}
 

@@ -2,6 +2,8 @@ package a
 
 import (
 	"database/sql/driver"
+	"maps"
+	"slices"
 	"time"
 
 	"github.com/mibk/dali"
@@ -180,6 +182,17 @@ func checkGuardedLessThanOne(db *dali.DB) {
 	db.Query("SELECT ?...", items) // OK
 }
 
+func checkGuardedInClosure(db *dali.DB) {
+	items := []int{1, 2}
+	if len(items) == 0 {
+		return
+	}
+	f := func() {
+		db.Query("SELECT ?...", items) // OK
+	}
+	f()
+}
+
 func checkGuardedTransitiveRange(db *dali.DB) {
 	items := []int{1, 2}
 	if len(items) == 0 {
@@ -190,6 +203,34 @@ func checkGuardedTransitiveRange(db *dali.DB) {
 		ids = append(ids, int64(i))
 	}
 	db.Query("SELECT ?...", ids) // OK
+}
+
+func checkGuardedTransitiveRangeCompact(db *dali.DB) {
+	items := []int{1, 2}
+	if len(items) == 0 {
+		return
+	}
+	var ids []int64
+	for _, i := range items {
+		ids = append(ids, int64(i))
+	}
+	ids = slices.Compact(ids)
+	db.Query("SELECT ?...", ids) // OK
+}
+
+func checkGuardedTransitiveRangeNestedBlock(db *dali.DB) {
+	items := []int{1, 2}
+	if len(items) == 0 {
+		return
+	}
+	var ids []int64
+	for _, i := range items {
+		ids = append(ids, int64(i))
+	}
+	{
+		ids = slices.Compact(ids)
+		db.Query("SELECT ?...", ids) // OK
+	}
 }
 
 func checkUnguardedTransitiveRange(db *dali.DB) {
@@ -234,4 +275,18 @@ func checkInterface(q *dali.Query) {
 
 func checkTx(tx *dali.Tx) {
 	tx.Query("SELECT ?, ?", 1) // want `Tx\.Query has 2 placeholder\(s\) but 1 arg\(s\)`
+}
+
+func checkGuardedDerived(db *dali.DB) {
+	m := map[int]bool{1: true}
+	if len(m) > 0 {
+		ids := slices.Sorted(maps.Keys(m))
+		db.Query("SELECT ?...", ids) // OK
+	}
+}
+
+func checkUnguardedDerived(db *dali.DB) {
+	m := map[int]bool{1: true}
+	ids := slices.Sorted(maps.Keys(m))
+	db.Query("SELECT ?...", ids) // want `slice "ids" passed to \?\.\.\. without a length check`
 }
