@@ -148,10 +148,10 @@ var placeholderTests = []struct {
 }
 
 func TestPlaceholders(t *testing.T) {
-	tr := Translator{dialect: FakeDialect{}}
+	exp := Expander{dialect: FakeDialect{}}
 	for _, tt := range placeholderTests {
 		t.Run(tt.sql, func(t *testing.T) {
-			str, err := tr.Translate(tt.sql, tt.args)
+			str, err := exp.Expand(tt.sql, tt.args)
 			if err != nil {
 				t.Fatalf("unexpected err: %v", err)
 			}
@@ -262,9 +262,9 @@ func (wh *Where) And(sql string, args ...any) *Where {
 	return wh
 }
 
-func (wh *Where) MarshalSQL(t Translator) (string, error) {
+func (wh *Where) MarshalSQL(e Expander) (string, error) {
 	sql := "(" + strings.Join(wh.conds, ") AND (") + ")"
-	return t.Translate(sql, wh.args)
+	return e.Expand(sql, wh.args)
 }
 
 type personProps struct {
@@ -322,10 +322,10 @@ var errorTests = []struct {
 }
 
 func TestErrors(t *testing.T) {
-	tr := Translator{dialect: FakeDialect{}}
+	exp := Expander{dialect: FakeDialect{}}
 	for _, tt := range errorTests {
 		t.Run(tt.sql, func(t *testing.T) {
-			_, err := tr.Translate(tt.sql, tt.args)
+			_, err := exp.Expand(tt.sql, tt.args)
 			if err == nil {
 				t.Fatal("an error was expected but none given")
 			}
@@ -384,10 +384,10 @@ var typesTests = []struct {
 }
 
 func TestPreprocessingTypes(t *testing.T) {
-	tr := Translator{dialect: FakeDialect{}}
+	exp := Expander{dialect: FakeDialect{}}
 	for _, tt := range typesTests {
 		t.Run(tt.sql, func(t *testing.T) {
-			str, err := tr.Translate(tt.sql, tt.args)
+			str, err := exp.Expand(tt.sql, tt.args)
 			if err != nil {
 				t.Fatalf("unexpected err: %v", err)
 			}
@@ -431,10 +431,10 @@ var preparedStmtTests = []struct {
 }
 
 func TestPreparedStmts(t *testing.T) {
-	tr := Translator{dialect: FakeDialect{}, preparedStmt: true}
+	exp := Expander{dialect: FakeDialect{}, preparedStmt: true}
 	for _, tt := range preparedStmtTests {
 		t.Run(tt.sql, func(t *testing.T) {
-			str, err := tr.Translate(tt.sql, tt.args)
+			str, err := exp.Expand(tt.sql, tt.args)
 			var gotErr string
 			if err != nil {
 				gotErr = err.Error()
@@ -453,31 +453,31 @@ func TestPreparedStmts(t *testing.T) {
 	}
 }
 
-var trans = Translator{dialect: FakeDialect{}}
+var trans = Expander{dialect: FakeDialect{}}
 
 func BenchmarkColumnEscaping(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		trans.Translate(`SELECT [first_name], [last_name] FROM [user]`, nil)
+		trans.Expand(`SELECT [first_name], [last_name] FROM [user]`, nil)
 	}
 }
 
 func BenchmarkBasicInterpolation(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		trans.Translate(`INSERT INTO ?ident (a, b) VALUES (?, ?)`,
+		trans.Expand(`INSERT INTO ?ident (a, b) VALUES (?, ?)`,
 			Args{"table", 3, "four"})
 	}
 }
 
 func BenchmarkSimpleValueExpansion(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		trans.Translate(`SELECT WHERE a IN (?...)`,
+		trans.Expand(`SELECT WHERE a IN (?...)`,
 			Args{[]int64{8, 99, 1013, 1202}})
 	}
 }
 
 func BenchmarkValuesClause(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		trans.Translate(`INSERT ?values`, Args{struct {
+		trans.Expand(`INSERT ?values`, Args{struct {
 			ID     int64
 			Name   string
 			Create time.Time
@@ -487,7 +487,7 @@ func BenchmarkValuesClause(b *testing.B) {
 
 func BenchmarkSetClause(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		trans.Translate(`UPDATE ?set`, Args{struct {
+		trans.Expand(`UPDATE ?set`, Args{struct {
 			ID   int64 `db:",selectonly"`
 			Name string
 			Age  int
@@ -497,7 +497,7 @@ func BenchmarkSetClause(b *testing.B) {
 
 func BenchmarkMultiValuesClause(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		trans.Translate(`INSERT ?values...`, Args{[]struct {
+		trans.Expand(`INSERT ?values...`, Args{[]struct {
 			ID   int64
 			Name string
 		}{

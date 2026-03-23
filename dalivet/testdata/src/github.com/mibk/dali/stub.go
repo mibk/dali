@@ -36,10 +36,13 @@ func (s *Stmt) BindContext(ctx context.Context, args ...any) *Query { return nil
 // Map is an alias for map[string]any.
 type Map map[string]any
 
-// Translator processes SQL queries.
-type Translator struct{}
+// Expander expands SQL queries.
+type Expander struct{}
+
+// Translator is a deprecated alias for Expander.
+type Translator = Expander
 
 // Marshaler is the interface for types that marshal to SQL.
 type Marshaler interface {
-	MarshalSQL(t Translator) (string, error)
+	MarshalSQL(e Expander) (string, error)
 }

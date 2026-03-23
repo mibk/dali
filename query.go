@@ -7,7 +7,7 @@ import (
 )
 
 // Query represents an arbitrary SQL statement.
-// The SQL is preprocessed by Translator before running.
+// The SQL is preprocessed by Expander before running.
 type Query struct {
 	ctx    context.Context
 	execer Execer

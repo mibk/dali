@@ -5,8 +5,8 @@ import (
 	"time"
 )
 
-// Dialect is the interface that describes a dialect of a particular SQL driver.
-type Dialect interface {
+// Escaper is the interface that describes a dialect of a particular SQL driver.
+type Escaper interface {
 	// EscapeIdent safely escapes identifiers (such as column or table
 	// names, etc.)
 	EscapeIdent(w io.Writer, ident string)
@@ -23,9 +23,12 @@ type Dialect interface {
 	// EscapeTime safely escapes time.Time variables.
 	EscapeTime(w io.Writer, t time.Time)
 
-	// PrintPlaceholderSign prints nth placeholder sign starting from 1.
-	PrintPlaceholderSign(w io.Writer, n int)
+	// WritePlaceholder writes the nth placeholder starting from 1.
+	WritePlaceholder(w io.Writer, n int)
 }
+
+// Deprecated: Use Escaper.
+type Dialect = Escaper
 
 // writeByte is a helper func for Dialect implementors.
 func writeByte(w io.Writer, b byte) (n int, err error) {

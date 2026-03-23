@@ -11,7 +11,7 @@ import (
 // Note that the EscapeTime method ignores the time zone, so if you
 // want to work with time zones different from your MySQL connection
 // time zone setting, you must convert it first.
-var MySQL Dialect = mySQL{}
+var MySQL Escaper = mySQL{}
 
 type mySQL struct{}
 
@@ -83,6 +83,6 @@ func (mySQL) EscapeTime(w io.Writer, t time.Time) {
 	writeByte(w, '\'')
 }
 
-func (mySQL) PrintPlaceholderSign(w io.Writer, n int) {
+func (mySQL) WritePlaceholder(w io.Writer, n int) {
 	writeByte(w, '?')
 }

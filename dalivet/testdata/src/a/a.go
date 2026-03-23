@@ -26,7 +26,7 @@ func (Valuer) Value() (driver.Value, error) { return nil, nil }
 
 type SQLMarshaler struct{}
 
-func (SQLMarshaler) MarshalSQL(t dali.Translator) (string, error) { return "1", nil }
+func (SQLMarshaler) MarshalSQL(e dali.Expander) (string, error) { return "1", nil }
 
 func checkOne(q *dali.Query) {
 	var u User

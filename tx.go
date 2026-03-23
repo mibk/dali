@@ -12,7 +12,7 @@ import (
 // the database.
 type Tx struct {
 	Tx         *sql.Tx
-	dialect    dialect.Dialect
+	dialect    dialect.Escaper
 	middleware func(Execer) Execer
 }
 

@@ -232,7 +232,7 @@ for more information.
 
 Currently, only a MySQL dialect is implemented directly in this package (see [dialects](dialects)
 for more information). Nevertheless, supporting another dialect should be as easy as creating
-a new dialect implementing *dialects.Dialect* interface. The most common dialects will be
+a new dialect implementing *dialect.Escaper* interface. The most common dialects will be
 implemented directly in the future.
 
 ## Thanks

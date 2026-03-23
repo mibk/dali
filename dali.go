@@ -14,13 +14,13 @@ import (
 // or scanning results.
 type DB struct {
 	DB         *sql.DB
-	dialect    dialect.Dialect
+	dialect    dialect.Escaper
 	middleware func(Execer) Execer
 }
 
 // NewDB instantiates DB from the given database/sql DB handle
 // in the particular dialect.
-func NewDB(db *sql.DB, d dialect.Dialect) *DB {
+func NewDB(db *sql.DB, d dialect.Escaper) *DB {
 	return &DB{
 		DB:         db,
 		dialect:    d,
@@ -32,7 +32,7 @@ func NewDB(db *sql.DB, d dialect.Dialect) *DB {
 // selects the appropriate dialect which is inferred from the driverName.
 // It returns an error if the dialect is not supported by dali itself.
 func Open(driverName, dataSourceName string) (*DB, error) {
-	var d dialect.Dialect
+	var d dialect.Escaper
 	switch driverName {
 	case "mysql":
 		d = dialect.MySQL

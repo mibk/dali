@@ -24,12 +24,12 @@ import (
 // statements ? emits a driver bind parameter without inspecting the
 // argument, so a Marshaler passed to ? would be silently ignored.
 type Marshaler interface {
-	MarshalSQL(t Translator) (string, error)
+	MarshalSQL(e Expander) (string, error)
 }
 
-// A Translator translates SQL queries using a dialect.
-type Translator struct {
-	dialect      dialect.Dialect
+// An Expander expands SQL queries using a dialect.
+type Expander struct {
+	dialect      dialect.Escaper
 	preparedStmt bool
 
 	err  error
@@ -39,49 +39,57 @@ type Translator struct {
 	param int // placeholder index
 }
 
-func translate(d dialect.Dialect, sql string, args []any) (string, error) {
-	t := Translator{
+// Deprecated: Use Expander.
+type Translator = Expander
+
+func translate(d dialect.Escaper, sql string, args []any) (string, error) {
+	e := Expander{
 		dialect: d,
 	}
-	return t.Translate(sql, args)
+	return e.Expand(sql, args)
 }
 
-func translatePreparedStmt(d dialect.Dialect, sql string, args []any) (string, error) {
-	t := Translator{
+func translatePreparedStmt(d dialect.Escaper, sql string, args []any) (string, error) {
+	e := Expander{
 		dialect:      d,
 		preparedStmt: true,
 	}
-	return t.Translate(sql, args)
+	return e.Expand(sql, args)
 }
 
-// Translate processes sql and args using the dialect specified in t.
+// Expand processes sql and args using the dialect specified in e.
 // It returns the resulting SQL query and an error, if there is one.
 // The value receiver is intentional: each call operates on its own
-// copy so that a single Translator can be reused concurrently.
-func (t Translator) Translate(sql string, args []any) (string, error) {
-	t.args = args
-	s, err := t.translate(sql)
+// copy so that a single Expander can be reused concurrently.
+func (e Expander) Expand(sql string, args []any) (string, error) {
+	e.args = args
+	s, err := e.translate(sql)
 	if err != nil {
 		return "", fmt.Errorf("dali: %w", err)
 	}
 	return s, nil
 }
 
-func (t Translator) clone() Translator {
-	return Translator{
-		dialect:      t.dialect,
-		preparedStmt: t.preparedStmt,
+// Deprecated: Use Expand.
+func (e Expander) Translate(sql string, args []any) (string, error) {
+	return e.Expand(sql, args)
+}
+
+func (e Expander) clone() Expander {
+	return Expander{
+		dialect:      e.dialect,
+		preparedStmt: e.preparedStmt,
 	}
 }
 
-func (t *Translator) checkInterpolationOf(placeholder string) error {
-	if t.preparedStmt {
+func (e *Expander) checkInterpolationOf(placeholder string) error {
+	if e.preparedStmt {
 		return fmt.Errorf("%s cannot be used in prepared statements", placeholder)
 	}
 	return nil
 }
 
-func (t *Translator) translate(sql string) (string, error) {
+func (e *Expander) translate(sql string) (string, error) {
 	b := new(bytes.Buffer)
 	pos := 0
 	for pos < len(sql) {
@@ -95,7 +103,7 @@ func (t *Translator) translate(sql string) (string, error) {
 				return "", fmt.Errorf("identifier not terminated")
 			}
 			col := sql[pos : pos+w]
-			t.dialect.EscapeIdent(b, col)
+			e.dialect.EscapeIdent(b, col)
 			pos += w + 1 // size of ']'
 		case '?':
 			start, end := pos, pos
@@ -112,42 +120,42 @@ func (t *Translator) translate(sql string) (string, error) {
 				pos += w
 				end = pos
 			}
-			if err := t.interpolate(b, sql[start:end], expand); err != nil {
+			if err := e.interpolate(b, sql[start:end], expand); err != nil {
 				return "", err
 			}
 		default:
 			b.WriteRune(r)
 		}
 	}
-	if t.index < len(t.args) {
-		return "", fmt.Errorf("only %d args are expected", t.index)
+	if e.index < len(e.args) {
+		return "", fmt.Errorf("only %d args are expected", e.index)
 	}
 	return b.String(), nil
 }
 
-func (t *Translator) nextArg() any {
-	if t.index >= len(t.args) {
-		t.try(fmt.Errorf("there is not enough args for placeholders"))
+func (e *Expander) nextArg() any {
+	if e.index >= len(e.args) {
+		e.try(fmt.Errorf("there is not enough args for placeholders"))
 		return nil
 	}
-	v := t.args[t.index]
-	t.index++
+	v := e.args[e.index]
+	e.index++
 	return v
 }
 
-func (t *Translator) nextParamNumber() int {
-	t.param++
-	return t.param
+func (e *Expander) nextParamNumber() int {
+	e.param++
+	return e.param
 }
 
-func (t *Translator) interpolate(b *bytes.Buffer, typ string, expand bool) error {
+func (e *Expander) interpolate(b *bytes.Buffer, typ string, expand bool) error {
 	if expand {
 		switch typ {
 		case "":
-			t.try(t.checkInterpolationOf("?..."))
-			t.try(t.escapeMultipleValues(b, t.nextArg()))
+			e.try(e.checkInterpolationOf("?..."))
+			e.try(e.escapeMultipleValues(b, e.nextArg()))
 		case "ident":
-			idents, ok := t.nextArg().([]string)
+			idents, ok := e.nextArg().([]string)
 			if !ok {
 				return fmt.Errorf("?ident... expects the argument to be a []string")
 			} else if len(idents) == 0 {
@@ -157,39 +165,39 @@ func (t *Translator) interpolate(b *bytes.Buffer, typ string, expand bool) error
 				if i > 0 {
 					b.WriteString(", ")
 				}
-				t.dialect.EscapeIdent(b, ident)
+				e.dialect.EscapeIdent(b, ident)
 			}
 		case "values":
-			t.try(t.checkInterpolationOf("?values..."))
-			t.try(t.printMultiValuesClause(b, t.nextArg()))
+			e.try(e.checkInterpolationOf("?values..."))
+			e.try(e.printMultiValuesClause(b, e.nextArg()))
 		default:
 			return fmt.Errorf("?%s cannot be expanded (...) or doesn't exist", typ)
 		}
 	} else {
 		switch typ {
 		case "":
-			if t.preparedStmt {
-				t.dialect.PrintPlaceholderSign(b, t.nextParamNumber())
+			if e.preparedStmt {
+				e.dialect.WritePlaceholder(b, e.nextParamNumber())
 				return nil
 			}
-			t.try(t.escapeValue(b, t.nextArg()))
+			e.try(e.escapeValue(b, e.nextArg()))
 		case "ident":
-			ident, ok := t.nextArg().(string)
+			ident, ok := e.nextArg().(string)
 			if !ok {
-				return t.try(
+				return e.try(
 					fmt.Errorf("?ident expects the argument to be a string"))
 			}
-			t.dialect.EscapeIdent(b, ident)
+			e.dialect.EscapeIdent(b, ident)
 		case "values":
-			t.try(t.checkInterpolationOf("?values"))
-			t.try(t.printValuesClause(b, t.nextArg()))
+			e.try(e.checkInterpolationOf("?values"))
+			e.try(e.printValuesClause(b, e.nextArg()))
 		case "set":
-			t.try(t.checkInterpolationOf("?set"))
-			t.try(t.printSetClause(b, t.nextArg()))
+			e.try(e.checkInterpolationOf("?set"))
+			e.try(e.printSetClause(b, e.nextArg()))
 		case "sql":
-			switch arg := t.nextArg().(type) {
+			switch arg := e.nextArg().(type) {
 			case Marshaler:
-				sql, err := arg.MarshalSQL(t.clone())
+				sql, err := arg.MarshalSQL(e.clone())
 				if err != nil {
 					return fmt.Errorf("marshal SQL: %w", err)
 				}
@@ -203,19 +211,19 @@ func (t *Translator) interpolate(b *bytes.Buffer, typ string, expand bool) error
 			return fmt.Errorf("unknown placeholder ?%s", typ)
 		}
 	}
-	return t.err
+	return e.err
 }
 
-func (t *Translator) try(err error) error {
-	if t.err == nil {
-		t.err = err
+func (e *Expander) try(err error) error {
+	if e.err == nil {
+		e.err = err
 	}
-	return t.err
+	return e.err
 }
 
 var timeType = reflect.TypeFor[time.Time]()
 
-func (t *Translator) escapeValue(b *bytes.Buffer, v any) error {
+func (e *Expander) escapeValue(b *bytes.Buffer, v any) error {
 	vv := reflect.ValueOf(v)
 	if valuer, ok := v.(driver.Valuer); ok {
 		if vv.Kind() == reflect.Pointer && vv.IsNil() {
@@ -239,9 +247,9 @@ func (t *Translator) escapeValue(b *bytes.Buffer, v any) error {
 			b.WriteString("NULL")
 			return nil
 		}
-		return t.escapeValue(b, vv.Elem().Interface())
+		return e.escapeValue(b, vv.Elem().Interface())
 	case reflect.Bool:
-		t.dialect.EscapeBool(b, vv.Bool())
+		e.dialect.EscapeBool(b, vv.Bool())
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		formatInt(b, vv.Int())
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
@@ -249,16 +257,16 @@ func (t *Translator) escapeValue(b *bytes.Buffer, v any) error {
 	case reflect.Float32, reflect.Float64:
 		formatFloat(b, vv.Float())
 	case reflect.String:
-		t.dialect.EscapeString(b, vv.String())
+		e.dialect.EscapeString(b, vv.String())
 	case reflect.Slice:
 		if vv.Type().Elem().Kind() == reflect.Uint8 {
-			t.dialect.EscapeBytes(b, vv.Bytes())
+			e.dialect.EscapeBytes(b, vv.Bytes())
 			break
 		}
 		return fmt.Errorf("only a slice of bytes supported; got: %T", v)
 	case reflect.Struct:
 		if vv.Type().ConvertibleTo(timeType) {
-			t.dialect.EscapeTime(b, vv.Convert(timeType).Interface().(time.Time))
+			e.dialect.EscapeTime(b, vv.Convert(timeType).Interface().(time.Time))
 			break
 		}
 		fallthrough
@@ -272,7 +280,7 @@ func formatInt(b *bytes.Buffer, i int64)     { b.WriteString(strconv.FormatInt(i
 func formatUint(b *bytes.Buffer, u uint64)   { b.WriteString(strconv.FormatUint(u, 10)) }
 func formatFloat(b *bytes.Buffer, f float64) { b.WriteString(strconv.FormatFloat(f, 'f', -1, 64)) }
 
-func (t *Translator) escapeMultipleValues(b *bytes.Buffer, v any) error {
+func (e *Expander) escapeMultipleValues(b *bytes.Buffer, v any) error {
 	vv := reflect.ValueOf(v)
 	if vv.Kind() != reflect.Slice {
 		return fmt.Errorf("?... expects the argument to be a slice")
@@ -286,15 +294,15 @@ func (t *Translator) escapeMultipleValues(b *bytes.Buffer, v any) error {
 		if i > 0 {
 			b.WriteString(", ")
 		}
-		if err := t.escapeValue(b, vv.Index(i).Interface()); err != nil {
+		if err := e.escapeValue(b, vv.Index(i).Interface()); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (t *Translator) printValuesClause(b *bytes.Buffer, v any) error {
-	cols, vals, err := t.deriveColsAndVals(v)
+func (e *Expander) printValuesClause(b *bytes.Buffer, v any) error {
+	cols, vals, err := e.deriveColsAndVals(v)
 	if err != nil {
 		return err
 	}
@@ -303,21 +311,21 @@ func (t *Translator) printValuesClause(b *bytes.Buffer, v any) error {
 		if i > 0 {
 			b.WriteString(", ")
 		}
-		t.dialect.EscapeIdent(b, c)
+		e.dialect.EscapeIdent(b, c)
 	}
 	b.WriteString(") VALUES (")
 	for i, v := range vals {
 		if i > 0 {
 			b.WriteString(", ")
 		}
-		t.try(t.escapeValue(b, v))
+		e.try(e.escapeValue(b, v))
 	}
 	b.WriteRune(')')
 	return nil
 }
 
-func (t *Translator) printSetClause(b *bytes.Buffer, v any) error {
-	cols, vals, err := t.deriveColsAndVals(v)
+func (e *Expander) printSetClause(b *bytes.Buffer, v any) error {
+	cols, vals, err := e.deriveColsAndVals(v)
 	if err != nil {
 		return err
 	}
@@ -327,16 +335,16 @@ func (t *Translator) printSetClause(b *bytes.Buffer, v any) error {
 			b.WriteString(", ")
 		}
 		v := vals[i]
-		t.dialect.EscapeIdent(b, c)
+		e.dialect.EscapeIdent(b, c)
 		b.WriteString(" = ")
-		t.try(t.escapeValue(b, v))
+		e.try(e.escapeValue(b, v))
 	}
 	return nil
 }
 
 // deriveColsAndVals derives column names from an underlying type of v and returns
 // them together with the corresponding values.
-func (t *Translator) deriveColsAndVals(v any) (cols []string, vals []any, err error) {
+func (e *Expander) deriveColsAndVals(v any) (cols []string, vals []any, err error) {
 	switch v := v.(type) {
 	case Map:
 		keys := make([]string, 0, len(v))
@@ -368,7 +376,7 @@ func (t *Translator) deriveColsAndVals(v any) (cols []string, vals []any, err er
 	return cols, vals, err
 }
 
-func (t *Translator) printMultiValuesClause(b *bytes.Buffer, v any) error {
+func (e *Expander) printMultiValuesClause(b *bytes.Buffer, v any) error {
 	errInvalidArg := fmt.Errorf("?values... expects the argument to be a slice of structs")
 	vv := reflect.ValueOf(v)
 	if vv.Kind() != reflect.Slice {
@@ -395,7 +403,7 @@ func (t *Translator) printMultiValuesClause(b *bytes.Buffer, v any) error {
 		if i > 0 {
 			b.WriteString(", ")
 		}
-		t.dialect.EscapeIdent(b, c)
+		e.dialect.EscapeIdent(b, c)
 	}
 	b.WriteString(") VALUES")
 	for i, length := 0, vv.Len(); i < length; i++ {
@@ -409,7 +417,7 @@ func (t *Translator) printMultiValuesClause(b *bytes.Buffer, v any) error {
 			if i > 0 {
 				b.WriteString(", ")
 			}
-			t.try(t.escapeValue(b, v))
+			e.try(e.escapeValue(b, v))
 		}
 		b.WriteRune(')')
 		if i != length-1 {
