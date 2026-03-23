@@ -476,9 +476,10 @@ func implementsValuer(t types.Type) bool {
 }
 
 // isSliceGuarded reports whether ident is guarded by a length check in the
-// surrounding code. It recognizes these patterns:
+// surrounding code. It walks enclosing blocks outward (including through
+// closure boundaries) and recognizes these patterns:
 //
-//   - Bail-out:    if len(x) == 0 { return } preceding the call in the same block
+//   - Bail-out:    if len(x) == 0 { return } preceding the call
 //   - Default:     if len(x) == 0 { x = fallback } preceding the call
 //   - Positive:    the call is inside if len(x) > 0 { ... }
 //   - Transitive:  x built via append inside for range Y, where Y is guarded
@@ -498,26 +499,33 @@ func isSliceGuarded(stack []ast.Node, ident *ast.Ident) bool {
 		}
 	}
 
-	// Find the nearest enclosing BlockStmt and the statement containing the call.
-	var block *ast.BlockStmt
-	var callStmt ast.Node
+	// Walk enclosing BlockStmts from innermost outward, checking each
+	// for guard patterns preceding the call (or the statement that
+	// contains the call in that block's scope).
 	for i := len(stack) - 1; i >= 0; i-- {
-		if b, ok := stack[i].(*ast.BlockStmt); ok {
-			block = b
-			if i+1 < len(stack) {
-				callStmt = stack[i+1]
-			}
-			break
+		block, ok := stack[i].(*ast.BlockStmt)
+		if !ok {
+			continue
+		}
+		if i+1 >= len(stack) {
+			continue
+		}
+		callStmt := stack[i+1]
+		if blockGuardsSlice(block, callStmt, name) {
+			return true
 		}
 	}
-	if block == nil || callStmt == nil {
-		return false
-	}
-	// Pattern A: bail-out or default-value preceding the call in the same block.
+	return false
+}
+
+// blockGuardsSlice checks whether block contains a guard for name before
+// callStmt. It checks Pattern A (bail-out/default), Pattern C (for range +
+// append), and Pattern D (make with len).
+func blockGuardsSlice(block *ast.BlockStmt, callStmt ast.Node, name string) bool {
+	// Pattern A: bail-out or default-value preceding the call.
 	if hasBailoutGuard(block.List, callStmt, name) {
 		return true
 	}
-
 	// Pattern C: name is appended to inside for range X, and X has a
 	// bail-out guard earlier in the block.
 	// Pattern D: name := make([]T, len(X)) and X has a bail-out guard.
