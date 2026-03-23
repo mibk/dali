@@ -195,6 +195,7 @@ func (c *checker) checkDBTxMethods(call *ast.CallExpr, method, typeName string, 
 	queryExpr := call.Args[queryArgIdx]
 	tv, ok := c.pass.TypesInfo.Types[queryExpr]
 	if !ok || tv.Value == nil || tv.Value.Kind() != constant.String {
+		c.pass.Reportf(queryExpr.Pos(), "%s.%s requires a constant query string", typeName, method)
 		return
 	}
 	query := constant.StringVal(tv.Value)

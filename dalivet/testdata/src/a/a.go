@@ -1,6 +1,7 @@
 package a
 
 import (
+	"context"
 	"database/sql/driver"
 	"maps"
 	"slices"
@@ -275,6 +276,26 @@ func checkInterface(q *dali.Query) {
 
 func checkTx(tx *dali.Tx) {
 	tx.Query("SELECT ?, ?", 1) // want `Tx\.Query has 2 placeholder\(s\) but 1 arg\(s\)`
+}
+
+func checkNonConstantQuery(db *dali.DB, tx *dali.Tx) {
+	sql := "SELECT 1"
+	db.Query(sql)   // want `DB\.Query requires a constant query string`
+	tx.Query(sql)   // want `Tx\.Query requires a constant query string`
+	db.Prepare(sql) // want `DB\.Prepare requires a constant query string`
+	tx.Prepare(sql) // want `Tx\.Prepare requires a constant query string`
+
+	ctx := context.Background()
+	db.QueryWithContext(ctx, sql) // want `DB\.QueryWithContext requires a constant query string`
+	tx.QueryWithContext(ctx, sql) // want `Tx\.QueryWithContext requires a constant query string`
+	db.PrepareContext(ctx, sql)   // want `DB\.PrepareContext requires a constant query string`
+	tx.PrepareContext(ctx, sql)   // want `Tx\.PrepareContext requires a constant query string`
+
+	const q = "SELECT 1"
+	db.Query(q)   // OK: const
+	tx.Query(q)   // OK: const
+	db.Prepare(q) // OK: const
+	tx.Prepare(q) // OK: const
 }
 
 func checkGuardedDerived(db *dali.DB) {
