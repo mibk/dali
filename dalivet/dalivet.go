@@ -485,16 +485,13 @@ func isSliceGuarded(stack []ast.Node, ident *ast.Ident) bool {
 	name := ident.Name
 
 	// Pattern B: call inside if len(x) > 0 { ... } (positive guard).
+	// The len check may be one conjunct in a && chain.
 	for i := len(stack) - 1; i >= 0; i-- {
 		ifStmt, ok := stack[i].(*ast.IfStmt)
 		if !ok {
 			continue
 		}
-		op, val, ok := matchLenCheck(ifStmt.Cond, name)
-		if !ok {
-			continue
-		}
-		if isPositiveGuard(op, val) {
+		if condHasPositiveLenGuard(ifStmt.Cond, name) {
 			return true
 		}
 	}
@@ -577,6 +574,19 @@ func matchLenCheck(expr ast.Expr, name string) (token.Token, int64, bool) {
 		return 0, 0, false
 	}
 	return op, val, true
+}
+
+// condHasPositiveLenGuard reports whether expr (or any conjunct in an &&
+// chain) contains a positive length guard for name.
+func condHasPositiveLenGuard(expr ast.Expr, name string) bool {
+	if bin, ok := expr.(*ast.BinaryExpr); ok && bin.Op == token.LAND {
+		return condHasPositiveLenGuard(bin.X, name) || condHasPositiveLenGuard(bin.Y, name)
+	}
+	op, val, ok := matchLenCheck(expr, name)
+	if !ok {
+		return false
+	}
+	return isPositiveGuard(op, val)
 }
 
 func isLenCall(expr ast.Expr, name string) bool {

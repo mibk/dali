@@ -155,6 +155,15 @@ func checkGuardedDefault(db *dali.DB) {
 	db.Query("SELECT ?...", items) // OK
 }
 
+func checkGuardedCompound(db *dali.DB) {
+	items := []int{1, 2}
+	var id *int
+	if id != nil && len(items) > 0 {
+		db.Query("SELECT ?...", items) // OK
+	}
+	_ = id
+}
+
 func checkGuardedLessThanOne(db *dali.DB) {
 	items := []int{1, 2}
 	if len(items) < 1 {
