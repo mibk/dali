@@ -100,7 +100,7 @@ func (c *checker) checkQueryMethods(call *ast.CallExpr, method string) {
 // checkOneArg checks that One's argument is *Struct.
 func (c *checker) checkOneArg(arg ast.Expr) {
 	t := c.pass.TypesInfo.TypeOf(arg)
-	if isInterface(t) {
+	if skipTypeCheck(t) {
 		return
 	}
 	ptr, ok := deref(t)
@@ -108,7 +108,7 @@ func (c *checker) checkOneArg(arg ast.Expr) {
 		c.pass.Reportf(arg.Pos(), "One requires a pointer to a struct, got %s", t)
 		return
 	}
-	if !isStruct(ptr) {
+	if !skipTypeCheck(ptr) && !isStruct(ptr) {
 		c.pass.Reportf(arg.Pos(), "One requires a pointer to a struct, got %s", t)
 	}
 }
@@ -116,7 +116,7 @@ func (c *checker) checkOneArg(arg ast.Expr) {
 // checkAllArg checks that All's argument is *[]Struct or *[]*Struct.
 func (c *checker) checkAllArg(arg ast.Expr) {
 	t := c.pass.TypesInfo.TypeOf(arg)
-	if isInterface(t) {
+	if skipTypeCheck(t) {
 		return
 	}
 	ptr, ok := deref(t)
@@ -126,7 +126,9 @@ func (c *checker) checkAllArg(arg ast.Expr) {
 	}
 	sl, ok := ptr.Underlying().(*types.Slice)
 	if !ok {
-		c.pass.Reportf(arg.Pos(), "All requires a pointer to a slice of structs, got %s", t)
+		if !skipTypeCheck(ptr) {
+			c.pass.Reportf(arg.Pos(), "All requires a pointer to a slice of structs, got %s", t)
+		}
 		return
 	}
 	elem := sl.Elem()
@@ -138,7 +140,7 @@ func (c *checker) checkAllArg(arg ast.Expr) {
 			return
 		}
 	}
-	if !isStruct(elem) {
+	if !skipTypeCheck(elem) && !isStruct(elem) {
 		c.pass.Reportf(arg.Pos(), "All requires a pointer to a slice of structs, got %s", t)
 	}
 }
@@ -146,7 +148,7 @@ func (c *checker) checkAllArg(arg ast.Expr) {
 // checkScanAllRowsArg checks that each argument is *[]T.
 func (c *checker) checkScanAllRowsArg(arg ast.Expr) {
 	t := c.pass.TypesInfo.TypeOf(arg)
-	if isInterface(t) {
+	if skipTypeCheck(t) {
 		return
 	}
 	ptr, ok := deref(t)
@@ -155,7 +157,9 @@ func (c *checker) checkScanAllRowsArg(arg ast.Expr) {
 		return
 	}
 	if _, ok := ptr.Underlying().(*types.Slice); !ok {
-		c.pass.Reportf(arg.Pos(), "ScanAllRows requires a pointer to a slice, got %s", t)
+		if !skipTypeCheck(ptr) {
+			c.pass.Reportf(arg.Pos(), "ScanAllRows requires a pointer to a slice, got %s", t)
+		}
 	}
 }
 
@@ -386,6 +390,17 @@ func derefType(t types.Type) types.Type {
 func isInterface(t types.Type) bool {
 	_, ok := t.Underlying().(*types.Interface)
 	return ok
+}
+
+func isTypeParam(t types.Type) bool {
+	_, ok := t.(*types.TypeParam)
+	return ok
+}
+
+// skipTypeCheck returns true for interfaces and type parameters,
+// where the concrete type isn't known statically.
+func skipTypeCheck(t types.Type) bool {
+	return isInterface(t) || isTypeParam(t)
 }
 
 func isStruct(t types.Type) bool {
