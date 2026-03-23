@@ -17,6 +17,12 @@ import (
 // Marshaler is the interface implemented by types that can marshal
 // themselves into valid SQL. Any type that implements Marshaler can
 // be used as an argument to the ?sql placeholder.
+//
+// Marshaler is intentionally not accepted by the plain ? placeholder.
+// First, ?sql signals to the reader that raw SQL is being injected,
+// whereas ? guarantees an escaped value. Second, in prepared
+// statements ? emits a driver bind parameter without inspecting the
+// argument, so a Marshaler passed to ? would be silently ignored.
 type Marshaler interface {
 	MarshalSQL(t Translator) (string, error)
 }
