@@ -583,10 +583,15 @@ func traceNonEmptySource(stmts []ast.Stmt, before ast.Node, name string) string 
 	return ""
 }
 
-// bodyWritesMapEntry reports whether body contains a statement of the form
-// name[k] = v (map index assignment).
+// bodyWritesMapEntry reports whether body unconditionally contains a
+// statement of the form name[k] = v (map index assignment). Like
+// bodyAppendsTo, it returns false if any earlier statement can skip
+// the iteration.
 func bodyWritesMapEntry(body *ast.BlockStmt, name string) bool {
 	for _, stmt := range body.List {
+		if stmtCanExit(stmt) {
+			return false
+		}
 		assign, ok := stmt.(*ast.AssignStmt)
 		if !ok || len(assign.Lhs) != 1 {
 			continue
@@ -604,10 +609,10 @@ func bodyWritesMapEntry(body *ast.BlockStmt, name string) bool {
 }
 
 func isSliceGuarded(stack []ast.Node, ident *ast.Ident) bool {
-	return isSliceNameGuarded(stack, ident.Name)
+	return isSliceNameGuarded(stack, ident.Name, nil)
 }
 
-func isSliceNameGuarded(stack []ast.Node, name string) bool {
+func isSliceNameGuarded(stack []ast.Node, name string, visited map[string]bool) bool {
 	// Pattern B: call inside if len(x) > 0 { ... } (positive guard).
 	// The len check may be one conjunct in a && chain.
 	// Extended: if the direct name doesn't match, trace the source of
@@ -658,8 +663,14 @@ func isSliceNameGuarded(stack []ast.Node, name string) bool {
 		}
 		callStmt := stack[i+1]
 		if src := traceNonEmptySource(block.List, callStmt, name); src != "" {
-			if isSliceNameGuarded(stack, src) {
-				return true
+			if visited == nil {
+				visited = map[string]bool{name: true}
+			}
+			if !visited[src] {
+				visited[src] = true
+				if isSliceNameGuarded(stack, src, visited) {
+					return true
+				}
 			}
 		}
 	}
@@ -727,10 +738,15 @@ func hasBailoutGuard(stmts []ast.Stmt, before ast.Node, name string) bool {
 	return false
 }
 
-// bodyAppendsTo reports whether body contains a top-level assignment of the
-// form name = append(name, ...).
+// bodyAppendsTo reports whether body unconditionally contains a top-level
+// assignment of the form name = append(name, ...). It returns false if any
+// earlier statement can skip the iteration (continue/break), since the append
+// would then be conditional and the result could be empty.
 func bodyAppendsTo(body *ast.BlockStmt, name string) bool {
 	for _, stmt := range body.List {
+		if stmtCanExit(stmt) {
+			return false
+		}
 		assign, ok := stmt.(*ast.AssignStmt)
 		if !ok || len(assign.Lhs) != 1 || len(assign.Rhs) != 1 {
 			continue
@@ -755,6 +771,29 @@ func bodyAppendsTo(body *ast.BlockStmt, name string) bool {
 			continue
 		}
 		return true
+	}
+	return false
+}
+
+// stmtCanExit reports whether stmt contains a continue or break that
+// could skip subsequent statements in a for body. Return statements
+// are NOT counted because if a return fires the slice is never used,
+// so the non-empty guarantee still holds for reachable code.
+func stmtCanExit(stmt ast.Stmt) bool {
+	switch s := stmt.(type) {
+	case *ast.BranchStmt:
+		return s.Tok == token.CONTINUE || s.Tok == token.BREAK
+	case *ast.IfStmt:
+		return blockCanExit(s.Body) || (s.Else != nil && stmtCanExit(s.Else))
+	}
+	return false
+}
+
+func blockCanExit(block *ast.BlockStmt) bool {
+	for _, stmt := range block.List {
+		if stmtCanExit(stmt) {
+			return true
+		}
 	}
 	return false
 }
