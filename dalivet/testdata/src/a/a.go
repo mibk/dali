@@ -1,0 +1,125 @@
+package a
+
+import (
+	"database/sql/driver"
+	"time"
+
+	"github.com/mibk/dali"
+)
+
+type User struct {
+	ID   int
+	Name string
+}
+
+type MyTime time.Time
+
+type Valuer struct{}
+
+func (Valuer) Value() (driver.Value, error) { return nil, nil }
+
+type SQLMarshaler struct{}
+
+func (SQLMarshaler) MarshalSQL(t dali.Translator) (string, error) { return "1", nil }
+
+func checkOne(q *dali.Query) {
+	var u User
+	q.One(&u)       // OK
+	q.One(u)        // want `One requires a pointer to a struct, got a\.User`
+	q.One(new(int)) // want `One requires a pointer to a struct, got \*int`
+	var s string
+	q.One(&s) // want `One requires a pointer to a struct, got \*string`
+}
+
+func checkAll(q *dali.Query) {
+	var users []User
+	q.All(&users) // OK
+	var ptrs []*User
+	q.All(&ptrs) // OK
+	q.All(users) // want `All requires a pointer to a slice of structs, got \[\]a\.User`
+	var ints []int
+	q.All(&ints) // want `All requires a pointer to a slice of structs, got \*\[\]int`
+	var pptrs []**User
+	q.All(&pptrs) // want `All does not allow pointer to pointer as slice element, got \*\[\]\*\*a\.User`
+}
+
+func checkScanAllRows(q *dali.Query) {
+	var ids []int
+	var names []string
+	q.ScanAllRows(&ids, &names) // OK
+	q.ScanAllRows(ids)          // want `ScanAllRows requires a pointer to a slice, got \[\]int`
+	var n int
+	q.ScanAllRows(&n) // want `ScanAllRows requires a pointer to a slice, got \*int`
+}
+
+func checkArgCount(db *dali.DB) {
+	db.Query("SELECT ?", 1)       // OK
+	db.Query("SELECT ?, ?", 1, 2) // OK
+	db.Query("SELECT ?, ?", 1)    // want `DB\.Query has 2 placeholder\(s\) but 1 arg\(s\)`
+	db.Query("SELECT ?", 1, 2)    // want `DB\.Query has 1 placeholder\(s\) but 2 arg\(s\)`
+	db.Query("SELECT 1")          // OK: no placeholders, no args
+}
+
+func checkArgCountPrepare(db *dali.DB) {
+	db.Prepare("SELECT ? WHERE [col] = ?")                  // OK: ? in Prepare doesn't consume args
+	db.Prepare("SELECT ? WHERE ?ident = ?", "col")          // OK: ?ident consumes 1 arg
+	db.Prepare("SELECT ? WHERE ?ident = ?", "col", "extra") // want `DB\.Prepare has 1 placeholder\(s\) but 2 arg\(s\)`
+}
+
+func checkPlaceholderTypes(db *dali.DB) {
+	db.Query("SELECT ?", 1)          // OK: int is scalar
+	db.Query("SELECT ?", "hello")    // OK: string is scalar
+	db.Query("SELECT ?", true)       // OK: bool is scalar
+	db.Query("SELECT ?", []byte{1})  // OK: []byte is fine
+	db.Query("SELECT ?", time.Now()) // OK: time.Time is fine
+
+	var u User
+	db.Query("SELECT ?", u)        // want `\? does not accept structs`
+	db.Query("SELECT ?", []int{1}) // want `\? does not accept slices`
+
+	db.Query("SELECT ?...", []int{1, 2}) // OK: ?... wants a slice
+	db.Query("SELECT ?...", 42)          // want `\?\.\.\. requires a slice, got int`
+
+	db.Query("SELECT ?ident", "col") // OK
+	db.Query("SELECT ?ident", 42)    // want `\?ident requires a string, got int`
+
+	db.Query("SELECT ?ident...", []string{"a"}) // OK
+	db.Query("SELECT ?ident...", []int{1})      // want `\?ident\.\.\. requires \[\]string, got \[\]int`
+
+	db.Query("INSERT ?values", &u)               // OK: struct
+	db.Query("INSERT ?values", dali.Map{"a": 1}) // OK: dali.Map
+	db.Query("INSERT ?values", 42)               // want `\?values requires a struct or dali\.Map, got int`
+
+	db.Query("UPDATE ?set", &u) // OK
+	db.Query("UPDATE ?set", 42) // want `\?set requires a struct or dali\.Map, got int`
+
+	db.Query("SELECT ?sql", "raw") // OK
+	var m SQLMarshaler
+	db.Query("SELECT ?sql", m)  // OK
+	db.Query("SELECT ?sql", 42) // want `\?sql requires a string or dali\.Marshaler, got int`
+}
+
+func checkInvalidPlaceholders(db *dali.DB) {
+	db.Query("SELECT ?foo", 1) // want `unknown placeholder \?foo`
+}
+
+func checkPrepareRestrictions(db *dali.DB) {
+	db.Prepare("SELECT ?... WHERE x = ?", []int{1})       // want `\?\.\.\. cannot be used in prepared statements`
+	db.Prepare("INSERT ?values WHERE x = ?", User{})      // want `\?values cannot be used in prepared statements`
+	db.Prepare("INSERT ?values... WHERE x = ?", []User{}) // want `\?values\.\.\. cannot be used in prepared statements`
+	db.Prepare("UPDATE ?set WHERE x = ?", User{})         // want `\?set cannot be used in prepared statements`
+}
+
+func checkValuer(db *dali.DB) {
+	var v Valuer
+	db.Query("SELECT ?", v) // OK: implements driver.Valuer
+}
+
+func checkInterface(q *dali.Query) {
+	var x any
+	q.One(x) // OK: interface, skip check
+}
+
+func checkTx(tx *dali.Tx) {
+	tx.Query("SELECT ?, ?", 1) // want `Tx\.Query has 2 placeholder\(s\) but 1 arg\(s\)`
+}
