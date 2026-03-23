@@ -147,6 +147,14 @@ func checkGuardedNotEqual(db *dali.DB) {
 	}
 }
 
+func checkGuardedDefault(db *dali.DB) {
+	items := []int64{1, 2}
+	if len(items) == 0 {
+		items = []int64{-1}
+	}
+	db.Query("SELECT ?...", items) // OK
+}
+
 func checkGuardedLessThanOne(db *dali.DB) {
 	items := []int{1, 2}
 	if len(items) < 1 {

@@ -476,9 +476,10 @@ func implementsValuer(t types.Type) bool {
 }
 
 // isSliceGuarded reports whether ident is guarded by a length check in the
-// surrounding code. It recognizes two patterns:
+// surrounding code. It recognizes three patterns:
 //
 //   - Bail-out: if len(x) == 0 { return } preceding the call in the same block
+//   - Default:  if len(x) == 0 { x = fallback } preceding the call
 //   - Positive: the call is inside if len(x) > 0 { ... }
 func isSliceGuarded(stack []ast.Node, ident *ast.Ident) bool {
 	name := ident.Name
@@ -498,7 +499,7 @@ func isSliceGuarded(stack []ast.Node, ident *ast.Ident) bool {
 		}
 	}
 
-	// Pattern A: bail-out preceding the call in the same block.
+	// Pattern A: bail-out or default-value preceding the call in the same block.
 	// Find the nearest enclosing BlockStmt and the statement containing the call.
 	var block *ast.BlockStmt
 	var callStmt ast.Node
@@ -526,7 +527,7 @@ func isSliceGuarded(stack []ast.Node, ident *ast.Ident) bool {
 		if !ok {
 			continue
 		}
-		if isZeroGuard(op, val) && blockTerminates(ifStmt.Body) {
+		if isZeroGuard(op, val) && (blockTerminates(ifStmt.Body) || blockAssigns(ifStmt.Body, name)) {
 			return true
 		}
 	}
@@ -603,6 +604,25 @@ func isPositiveGuard(op token.Token, val int64) bool {
 	return (op == token.GTR && val == 0) ||
 		(op == token.NEQ && val == 0) ||
 		(op == token.GEQ && val == 1)
+}
+
+// blockAssigns reports whether block contains an assignment to the named
+// identifier (e.g. x = ...). This recognizes the "default value" pattern:
+//
+//	if len(x) == 0 { x = []int{-1} }
+func blockAssigns(block *ast.BlockStmt, name string) bool {
+	for _, stmt := range block.List {
+		assign, ok := stmt.(*ast.AssignStmt)
+		if !ok || assign.Tok != token.ASSIGN {
+			continue
+		}
+		for _, lhs := range assign.Lhs {
+			if id, ok := lhs.(*ast.Ident); ok && id.Name == name {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func blockTerminates(block *ast.BlockStmt) bool {
