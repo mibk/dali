@@ -183,6 +183,50 @@ func checkGuardedLessThanOne(db *dali.DB) {
 	db.Query("SELECT ?...", items) // OK
 }
 
+func checkGuardedElseIfBailout(db *dali.DB) error {
+	items, err := makeItems()
+	if err != nil {
+		return err
+	} else if len(items) == 0 {
+		return nil
+	}
+	db.Query("SELECT ?...", items) // OK
+	return nil
+}
+
+func checkGuardedElseIfBailoutPanic(db *dali.DB) {
+	items, err := makeItems()
+	if err != nil {
+		panic(err)
+	} else if len(items) == 0 {
+		panic("empty")
+	}
+	db.Query("SELECT ?...", items) // OK
+}
+
+func checkGuardedElseIfDefault(db *dali.DB) error {
+	items, err := makeItems()
+	if err != nil {
+		return err
+	} else if len(items) == 0 {
+		items = []int{-1}
+	}
+	db.Query("SELECT ?...", items) // OK
+	return nil
+}
+
+func checkUnguardedElseIfNonTerminating(db *dali.DB) {
+	items, _ := makeItems()
+	if items == nil {
+		items = []int{} // does not terminate
+	} else if len(items) == 0 {
+		return
+	}
+	db.Query("SELECT ?...", items) // want `slice "items" passed to \?\.\.\. without a length check`
+}
+
+func makeItems() ([]int, error) { return nil, nil }
+
 func checkGuardedInClosure(db *dali.DB) {
 	items := []int{1, 2}
 	if len(items) == 0 {

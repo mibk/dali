@@ -546,6 +546,7 @@ func traceSliceSource(stmts []ast.Stmt, name string) string {
 //   - Transitive:  x built via append inside for range Y, where Y is guarded
 //   - Make(len):   x := make([]T, len(Y)), where Y is guarded
 //   - Derived:     x := slices.Sorted(maps.Keys(m)) inside if len(m) > 0
+//
 // traceNonEmptySource scans stmts (up to but not including before) for a
 // statement that establishes name's non-emptiness from some source variable.
 // Returns that source's name or "".
@@ -728,15 +729,32 @@ func hasBailoutGuard(stmts []ast.Stmt, before ast.Node, name string) bool {
 		if !ok {
 			continue
 		}
-		op, val, ok := matchLenCheck(ifStmt.Cond, name)
-		if !ok {
-			continue
-		}
-		if isZeroGuard(op, val) && (blockTerminates(ifStmt.Body) || blockAssigns(ifStmt.Body, name)) {
+		if ifChainGuardsSlice(ifStmt, name) {
 			return true
 		}
 	}
 	return false
+}
+
+// ifChainGuardsSlice walks an if / else-if chain looking for a
+// zero-length guard on name.  An else-if branch counts as a valid
+// guard when every preceding branch in the chain terminates, because
+// reaching code after the chain implies the guard condition was false.
+func ifChainGuardsSlice(ifStmt *ast.IfStmt, name string) bool {
+	for {
+		op, val, ok := matchLenCheck(ifStmt.Cond, name)
+		if ok && isZeroGuard(op, val) && (blockTerminates(ifStmt.Body) || blockAssigns(ifStmt.Body, name)) {
+			return true
+		}
+		// Walk into the else-if chain only when the current body
+		// terminates — otherwise execution can fall through without
+		// the length ever being tested.
+		elseIf, ok := ifStmt.Else.(*ast.IfStmt)
+		if !ok || !blockTerminates(ifStmt.Body) {
+			return false
+		}
+		ifStmt = elseIf
+	}
 }
 
 // bodyAppendsTo reports whether body unconditionally contains a top-level
