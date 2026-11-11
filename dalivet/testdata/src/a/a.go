@@ -619,3 +619,16 @@ func checkSelectorAssignedFromGuarded(db *dali.DB, m map[int]bool, items []int) 
 	v.Pos = make([]int, len(items))
 	db.Query("SELECT ?...", v.Pos) // OK
 }
+
+func checkElseOfZeroGuard(db *dali.DB, items []int, ok bool) {
+	if len(items) == 0 || !ok {
+		db.Query("SELECT ?...", items) // want `slice "items" passed to \?\.\.\. without a length check`
+	} else {
+		db.Query("SELECT ?...", items) // OK
+	}
+	if len(items) == 0 && ok {
+		return
+	} else {
+		db.Query("SELECT ?...", items) // want `slice "items" passed to \?\.\.\. without a length check`
+	}
+}

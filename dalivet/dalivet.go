@@ -660,7 +660,13 @@ func isSliceNameGuarded(stack []ast.Node, name string, visited map[string]bool) 
 	// name from the if body and re-check.
 	for i := len(stack) - 1; i >= 0; i-- {
 		ifStmt, ok := stack[i].(*ast.IfStmt)
-		if !ok || i+1 >= len(stack) || stack[i+1] != ifStmt.Body {
+		if !ok || i+1 >= len(stack) {
+			continue
+		}
+		if stack[i+1] == ifStmt.Else && condHasZeroLenGuard(ifStmt.Cond, name) {
+			return true
+		}
+		if stack[i+1] != ifStmt.Body {
 			continue
 		}
 		if condHasPositiveLenGuard(ifStmt.Cond, name) {
