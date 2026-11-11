@@ -49,7 +49,9 @@ func escapeBytes(w io.Writer, bytes []byte) {
 		case 0:
 			io.WriteString(w, `\0`)
 		case '\'':
-			io.WriteString(w, `\'`)
+			// Doubling the quote, unlike \', cannot be broken out of
+			// when the server runs with NO_BACKSLASH_ESCAPES.
+			io.WriteString(w, `''`)
 		case '"':
 			io.WriteString(w, `\"`)
 		case '\b':

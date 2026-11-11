@@ -50,8 +50,8 @@ func TestEscapeString(t *testing.T) {
 		exp string
 	}{
 		{"simple", "'simple'"},
-		{`simplers's "world"`, `'simplers\'s \"world\"'`},
-		{"\x00'\"\b\n\r", `'\0\'\"\b\n\r'`},
+		{`simplers's "world"`, `'simplers''s \"world\"'`},
+		{"\x00'\"\b\n\r", `'\0''\"\b\n\r'`},
 		{"\t\x1A\\", `'\t\Z\\'`},
 		{"příliš žluťoučký kůň úpěl ďábelské ódy", "'příliš žluťoučký kůň úpěl ďábelské ódy'"},
 	}

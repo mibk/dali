@@ -103,6 +103,14 @@ To avoid this just use the whole string as a parameter.
 conn.Query(`SELECT * FROM foo WHERE name = ?`, "really?")
 ```
 
+DALí escapes values itself instead of sending them as bind parameters, so the escaping
+must match how the server parses string literals. It is safe for MySQL and MariaDB
+connections using a UTF-8 character set (`utf8mb4`, `utf8mb3`) in the default SQL mode.
+Avoid multi-byte character sets such as GBK, Big5 or SJIS, whose characters can contain
+the byte of a backslash and so swallow an escape. With `NO_BACKSLASH_ESCAPES` enabled
+the escaping stays safe, but values containing backslashes or control characters are
+stored mangled (`\n` arrives as the two characters `\` and `n`).
+
 ## Features
 
 ### Identifier escaping
