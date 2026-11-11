@@ -105,6 +105,21 @@ func checkPlaceholderTypes(db *dali.DB) {
 	db.Query("SELECT ?sql", 42) // want `\?sql requires a string or dali\.Marshaler, got int`
 }
 
+type (
+	Names []string
+	Col   string
+)
+
+func checkAssertedTypes(db *dali.DB) {
+	const c = "col"
+	db.Query("SELECT ?ident", c)             // OK
+	db.Query("SELECT ?ident", Col("a"))      // want `\?ident requires a string, got a\.Col`
+	db.Query("SELECT ?ident...", Names{"a"}) // want `\?ident\.\.\. requires \[\]string, got a\.Names`
+	db.Query("SELECT ?ident...", []Col{"a"}) // want `\?ident\.\.\. requires \[\]string, got \[\]a\.Col`
+	db.Query("SELECT ?sql", Col("a"))        // want `\?sql requires a string or dali\.Marshaler, got a\.Col`
+	db.Query("SELECT ?sql", c)               // OK
+}
+
 func checkInvalidPlaceholders(db *dali.DB) {
 	db.Query("SELECT ?foo", 1)             // want `unknown placeholder \?foo`
 	db.Query("SELECT [broken")             // want `identifier not terminated`

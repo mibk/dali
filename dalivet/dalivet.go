@@ -331,7 +331,7 @@ func (c *checker) checkPlaceholderType(arg ast.Expr, ph Placeholder, argType typ
 				c.pass.Reportf(arg.Pos(), "?... requires a slice, got %s", argType)
 			}
 		case "ident": // ?ident...
-			if !isSliceOfString(argType) {
+			if !isStringSlice(argType) {
 				c.pass.Reportf(arg.Pos(), "?ident... requires []string, got %s", argType)
 			}
 		case "values": // ?values...
@@ -346,7 +346,7 @@ func (c *checker) checkPlaceholderType(arg ast.Expr, ph Placeholder, argType typ
 	case "": // ?
 		c.checkScalarArg(arg, argType)
 	case "ident": // ?ident
-		if !isStringType(argType) {
+		if !isString(argType) {
 			c.pass.Reportf(arg.Pos(), "?ident requires a string, got %s", argType)
 		}
 	case "values": // ?values
@@ -354,7 +354,7 @@ func (c *checker) checkPlaceholderType(arg ast.Expr, ph Placeholder, argType typ
 	case "set": // ?set
 		c.checkStructOrMap(arg, argType, "?set")
 	case "sql": // ?sql
-		if !isStringType(argType) && !implementsMarshaler(argType) {
+		if !isString(argType) && !implementsMarshaler(argType) {
 			c.pass.Reportf(arg.Pos(), "?sql requires a string or dali.Marshaler, got %s", argType)
 		}
 	}
@@ -471,17 +471,15 @@ func isSlice(t types.Type) bool {
 	return ok
 }
 
-func isStringType(t types.Type) bool {
-	b, ok := t.Underlying().(*types.Basic)
-	return ok && b.Info()&types.IsString != 0
+// isString reports whether t is exactly string.
+// The runtime uses type assertions, so a named string type fails.
+func isString(t types.Type) bool {
+	b, ok := types.Unalias(t).(*types.Basic)
+	return ok && (b.Kind() == types.String || b.Kind() == types.UntypedString)
 }
 
-func isSliceOfString(t types.Type) bool {
-	sl, ok := t.Underlying().(*types.Slice)
-	if !ok {
-		return false
-	}
-	return isStringType(sl.Elem())
+func isStringSlice(t types.Type) bool {
+	return types.Identical(t, types.NewSlice(types.Typ[types.String]))
 }
 
 func isDaliMap(t types.Type) bool {
