@@ -657,3 +657,11 @@ func checkIgnoreDirective(db *dali.DB, items []int) {
 	db.Query("SELECT 1")           //dalivet:ignore
 	db.Query("SELECT ?...", items) // want `slice "items" passed to \?\.\.\. without a length check`
 }
+
+func checkRepeatedSlice(db *dali.DB, items, ids []int) {
+	db.Query("SELECT ?... UNION SELECT ?... UNION SELECT ?...",
+		items, // want `slice "items" passed to \?\.\.\. without a length check`
+		ids,   // want `slice "ids" passed to \?\.\.\. without a length check`
+		items, // OK: reported above
+	)
+}

@@ -331,6 +331,7 @@ func (c *checker) checkDBTxMethods(call *ast.CallExpr, method, typeName string, 
 
 	// Check 3: placeholder type checking.
 	argIdx := argsStart
+	reported := make(map[string]bool)
 	for _, ph := range phs {
 		if isPrepare && ph.Type == "" && !ph.Expand {
 			continue
@@ -346,9 +347,11 @@ func (c *checker) checkDBTxMethods(call *ast.CallExpr, method, typeName string, 
 					c.reportf(arg.Pos(), "empty slice passed to ?%s...", ph.Type)
 				}
 			case *ast.Ident, *ast.SelectorExpr, *ast.CallExpr:
-				if !isSliceGuarded(c.pass.TypesInfo, stack, a) {
+				name := types.ExprString(a)
+				if !reported[name] && !isSliceGuarded(c.pass.TypesInfo, stack, a) {
+					reported[name] = true
 					c.reportf(arg.Pos(),
-						"slice %q passed to ?%s... without a length check", types.ExprString(a), ph.Type)
+						"slice %q passed to ?%s... without a length check", name, ph.Type)
 				}
 			}
 		}
