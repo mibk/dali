@@ -651,6 +651,23 @@ func checkNonEmptyLiteral(db *dali.DB, id int64, items []int64) {
 	db.Query("SELECT ?...", unset) // want `slice "unset" passed to \?\.\.\. without a length check`
 }
 
+var (
+	defaultStates = map[string]bool{"active": true}
+	defaultIDs    = []int64{1, 2}
+	noIDs         = []int64{}
+)
+
+func checkNonEmptyPkgVar(db *dali.DB) {
+	db.Query("SELECT ?...", slices.Sorted(maps.Keys(defaultStates))) // OK
+	db.Query("SELECT ?...", defaultIDs)                              // OK
+	ids := slices.Clone(defaultIDs)
+	db.Query("SELECT ?...", ids)   // OK
+	db.Query("SELECT ?...", noIDs) // want `slice "noIDs" passed to \?\.\.\. without a length check`
+
+	defaultIDs := []int64{}
+	db.Query("SELECT ?...", defaultIDs) // want `slice "defaultIDs" passed to \?\.\.\. without a length check`
+}
+
 func checkRepeatedSlice(db *dali.DB, items, ids []int) {
 	db.Query("SELECT ?... UNION SELECT ?... UNION SELECT ?...",
 		items, // want `slice "items" passed to \?\.\.\. without a length check`

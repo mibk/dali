@@ -39,6 +39,10 @@ type checker struct {
 	pass     *analysis.Pass
 	timeType types.Type // time.Time, lazily resolved
 	ignored  map[lineKey]bool
+
+	// nonEmptyVars holds the package-level variables
+	// initialized with a non-empty slice or map literal.
+	nonEmptyVars map[types.Object]bool
 }
 
 type lineKey struct {
@@ -52,7 +56,7 @@ func run(pass *analysis.Pass) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	c := &checker{pass: pass, ignored: ignored}
+	c := &checker{pass: pass, ignored: ignored, nonEmptyVars: nonEmptyPkgVars(pass)}
 
 	nodeFilter := []ast.Node{
 		(*ast.CallExpr)(nil),
@@ -147,6 +151,42 @@ func ignoredLines(pass *analysis.Pass) (map[lineKey]bool, error) {
 func isIgnoreDirective(text string) bool {
 	rest, ok := strings.CutPrefix(text, "//dalivet:ignore")
 	return ok && (rest == "" || rest[0] == ' ' || rest[0] == '\t')
+}
+
+func nonEmptyPkgVars(pass *analysis.Pass) map[types.Object]bool {
+	vars := make(map[types.Object]bool)
+	for _, f := range pass.Files {
+		for _, decl := range f.Decls {
+			gen, ok := decl.(*ast.GenDecl)
+			if !ok || gen.Tok != token.VAR {
+				continue
+			}
+			for _, spec := range gen.Specs {
+				vs := spec.(*ast.ValueSpec)
+				if len(vs.Values) != len(vs.Names) {
+					continue
+				}
+				for i, id := range vs.Names {
+					if isNonEmptyLit(pass.TypesInfo, vs.Values[i]) {
+						vars[pass.TypesInfo.Defs[id]] = true
+					}
+				}
+			}
+		}
+	}
+	return vars
+}
+
+func isNonEmptyLit(info *types.Info, expr ast.Expr) bool {
+	lit, ok := expr.(*ast.CompositeLit)
+	if !ok || len(lit.Elts) == 0 {
+		return false
+	}
+	switch info.TypeOf(lit).Underlying().(type) {
+	case *types.Map, *types.Slice:
+		return true
+	}
+	return false
 }
 
 func (c *checker) reportf(pos token.Pos, format string, args ...any) {
@@ -348,7 +388,7 @@ func (c *checker) checkDBTxMethods(call *ast.CallExpr, method, typeName string, 
 				}
 			case *ast.Ident, *ast.SelectorExpr, *ast.CallExpr:
 				name := types.ExprString(a)
-				if !reported[name] && !isSliceGuarded(c.pass.TypesInfo, stack, a) {
+				if !reported[name] && !c.isSliceGuarded(stack, a) {
 					reported[name] = true
 					c.reportf(arg.Pos(),
 						"slice %q passed to ?%s... without a length check", name, ph.Type)
@@ -705,7 +745,7 @@ func bodyWritesMapEntry(body *ast.BlockStmt, name string) bool {
 	return false
 }
 
-func isSliceGuarded(info *types.Info, stack []ast.Node, expr ast.Expr) bool {
+func (c *checker) isSliceGuarded(stack []ast.Node, expr ast.Expr) bool {
 	name := exprName(expr)
 	if _, ok := expr.(*ast.CallExpr); ok {
 		name = traceCallSource(expr)
@@ -715,10 +755,14 @@ func isSliceGuarded(info *types.Info, stack []ast.Node, expr ast.Expr) bool {
 		// which cannot be length-checked without storing it first.
 		return true
 	}
-	return isSliceNameGuarded(info, stack, name, nil)
+	return c.isSliceNameGuarded(stack, name, nil)
 }
 
-func isSliceNameGuarded(info *types.Info, stack []ast.Node, name string, visited map[string]bool) bool {
+func (c *checker) isSliceNameGuarded(stack []ast.Node, name string, visited map[string]bool) bool {
+	if c.isNonEmptyPkgVar(stack[len(stack)-1].Pos(), name) {
+		return true
+	}
+
 	// Pattern B: call inside if len(x) > 0 { ... } (positive guard).
 	// The len check may be one conjunct in a && chain.
 	// Extended: if the direct name doesn't match, trace the source of
@@ -756,7 +800,7 @@ func isSliceNameGuarded(info *types.Info, stack []ast.Node, name string, visited
 			continue
 		}
 		callStmt := stack[i+1]
-		if blockGuardsSlice(info, block, callStmt, name) {
+		if blockGuardsSlice(c.pass.TypesInfo, block, callStmt, name) {
 			return true
 		}
 	}
@@ -780,13 +824,27 @@ func isSliceNameGuarded(info *types.Info, stack []ast.Node, name string, visited
 			}
 			if !visited[src] {
 				visited[src] = true
-				if isSliceNameGuarded(info, stack, src, visited) {
+				if c.isSliceNameGuarded(stack, src, visited) {
 					return true
 				}
 			}
 		}
 	}
 	return false
+}
+
+// isNonEmptyPkgVar reports whether name, as seen at pos,
+// is a package-level variable initialized with a non-empty literal.
+func (c *checker) isNonEmptyPkgVar(pos token.Pos, name string) bool {
+	if len(c.nonEmptyVars) == 0 {
+		return false
+	}
+	scope := c.pass.Pkg.Scope().Innermost(pos)
+	if scope == nil {
+		return false
+	}
+	_, obj := scope.LookupParent(name, pos)
+	return c.nonEmptyVars[obj]
 }
 
 // blockGuardsSlice checks whether block contains a guard for name before
