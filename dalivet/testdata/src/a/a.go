@@ -632,3 +632,14 @@ func checkElseOfZeroGuard(db *dali.DB, items []int, ok bool) {
 		db.Query("SELECT ?...", items) // want `slice "items" passed to \?\.\.\. without a length check`
 	}
 }
+
+type skipper struct{}
+
+func (skipper) Skip() {}
+
+func checkCustomSkip(db *dali.DB, items []int, s skipper) {
+	if len(items) == 0 {
+		s.Skip()
+	}
+	db.Query("SELECT ?...", items) // want `slice "items" passed to \?\.\.\. without a length check`
+}

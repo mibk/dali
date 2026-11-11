@@ -13,6 +13,7 @@ import (
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/inspect"
 	"golang.org/x/tools/go/ast/inspector"
+	"golang.org/x/tools/go/types/typeutil"
 )
 
 const daliPkg = "github.com/mibk/dali"
@@ -1082,7 +1083,6 @@ func blockTerminates(info *types.Info, block *ast.BlockStmt) bool {
 
 // neverReturn lists the functions and methods of log, *log.Logger
 // and testing.TB that do not return.
-// They are matched by name alone, whatever the receiver.
 var neverReturn = map[string]bool{
 	"Fatal": true, "Fatalf": true, "Fatalln": true,
 	"Panic": true, "Panicf": true, "Panicln": true,
@@ -1090,14 +1090,19 @@ var neverReturn = map[string]bool{
 }
 
 func isTerminatingCall(info *types.Info, call *ast.CallExpr) bool {
-	switch fn := call.Fun.(type) {
-	case *ast.Ident:
-		return fn.Name == "panic"
-	case *ast.SelectorExpr:
-		if x, ok := fn.X.(*ast.Ident); ok && x.Name == "os" && fn.Sel.Name == "Exit" {
-			return true
+	switch fn := typeutil.Callee(info, call).(type) {
+	case *types.Builtin:
+		return fn.Name() == "panic"
+	case *types.Func:
+		if fn.Pkg() == nil {
+			return false
 		}
-		return neverReturn[fn.Sel.Name]
+		switch fn.Pkg().Path() {
+		case "os":
+			return fn.Name() == "Exit"
+		case "log", "testing":
+			return neverReturn[fn.Name()]
+		}
 	}
 	return false
 }
