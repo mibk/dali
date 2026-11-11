@@ -103,8 +103,10 @@ func checkPlaceholderTypes(db *dali.DB) {
 }
 
 func checkInvalidPlaceholders(db *dali.DB) {
-	db.Query("SELECT ?foo", 1) // want `unknown placeholder \?foo`
-	db.Query("SELECT [broken") // want `identifier not terminated`
+	db.Query("SELECT ?foo", 1)             // want `unknown placeholder \?foo`
+	db.Query("SELECT [broken")             // want `identifier not terminated`
+	db.Query("UPDATE ?set...", User{})     // want `\?set cannot be expanded`
+	db.Query("SELECT ?sql...", []string{}) // want `\?sql cannot be expanded`
 }
 
 func checkPrepareRestrictions(db *dali.DB) {

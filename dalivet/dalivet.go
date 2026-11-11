@@ -223,6 +223,10 @@ func (c *checker) checkDBTxMethods(call *ast.CallExpr, method, typeName string, 
 			c.pass.Reportf(queryExpr.Pos(), "unknown placeholder ?%s", ph.Type)
 			return
 		}
+		if ph.Expand && !isExpandable(ph.Type) {
+			c.pass.Reportf(queryExpr.Pos(), "?%s cannot be expanded (...)", ph.Type)
+			return
+		}
 		if isPrepare {
 			name := "?" + ph.Type
 			if ph.Expand {
@@ -296,6 +300,14 @@ func (c *checker) checkDBTxMethods(call *ast.CallExpr, method, typeName string, 
 func isValidPlaceholder(typ string) bool {
 	switch typ {
 	case "", "ident", "values", "set", "sql":
+		return true
+	}
+	return false
+}
+
+func isExpandable(typ string) bool {
+	switch typ {
+	case "", "ident", "values":
 		return true
 	}
 	return false
