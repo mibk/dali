@@ -643,3 +643,17 @@ func checkCustomSkip(db *dali.DB, items []int, s skipper) {
 	}
 	db.Query("SELECT ?...", items) // want `slice "items" passed to \?\.\.\. without a length check`
 }
+
+func checkIgnoreDirective(db *dali.DB, items []int) {
+	db.Query("SELECT ?...", items) //dalivet:ignore
+	db.Query("SELECT ?...", items) //dalivet:ignore callers check the length
+	//dalivet:ignore callers check the length
+	db.Query("SELECT ?...", items)
+	db.Query("SELECT ?", items) //dalivet:ignore
+
+	db.Query("SELECT ?...", items) // want `slice "items" passed to \?\.\.\. without a length check`
+	//dalivet:ignored
+	db.Query("SELECT ?...", items) // want `slice "items" passed to \?\.\.\. without a length check`
+	db.Query("SELECT 1")           //dalivet:ignore
+	db.Query("SELECT ?...", items) // want `slice "items" passed to \?\.\.\. without a length check`
+}

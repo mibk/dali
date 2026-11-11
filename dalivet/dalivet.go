@@ -9,6 +9,7 @@ import (
 	"go/types"
 	"slices"
 	"strconv"
+	"strings"
 
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/inspect"
@@ -21,19 +22,37 @@ const daliPkg = "github.com/mibk/dali"
 // Analyzer is the dalivet analyzer for use with go/analysis.
 var Analyzer = &analysis.Analyzer{
 	Name:     "dalivet",
-	Doc:      "checks for common dali usage mistakes",
+	Doc:      doc,
 	Run:      run,
 	Requires: []*analysis.Analyzer{inspect.Analyzer},
 }
 
+const doc = `checks for common dali usage mistakes
+
+A //dalivet:ignore comment suppresses every diagnostic on its line,
+or on the next line when the comment stands on a line of its own.
+Free text may follow the directive:
+
+    db.Query("SELECT ?...", ids) //dalivet:ignore callers check the length`
+
 type checker struct {
 	pass     *analysis.Pass
 	timeType types.Type // time.Time, lazily resolved
+	ignored  map[lineKey]bool
+}
+
+type lineKey struct {
+	file string
+	line int
 }
 
 func run(pass *analysis.Pass) (any, error) {
 	insp := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
-	c := &checker{pass: pass}
+	ignored, err := ignoredLines(pass)
+	if err != nil {
+		return nil, err
+	}
+	c := &checker{pass: pass, ignored: ignored}
 
 	nodeFilter := []ast.Node{
 		(*ast.CallExpr)(nil),
@@ -96,6 +115,48 @@ func run(pass *analysis.Pass) (any, error) {
 	return nil, nil
 }
 
+// ignoredLines returns the lines that a //dalivet:ignore directive covers.
+func ignoredLines(pass *analysis.Pass) (map[lineKey]bool, error) {
+	ignored := make(map[lineKey]bool)
+	for _, f := range pass.Files {
+		var src []byte
+		for _, cg := range f.Comments {
+			for _, cm := range cg.List {
+				if !isIgnoreDirective(cm.Text) {
+					continue
+				}
+				tf := pass.Fset.File(cm.Pos())
+				if src == nil {
+					var err error
+					if src, err = pass.ReadFile(tf.Name()); err != nil {
+						return nil, err
+					}
+				}
+				line := tf.Line(cm.Pos())
+				before := src[tf.Offset(tf.LineStart(line)):tf.Offset(cm.Pos())]
+				if len(strings.TrimSpace(string(before))) == 0 {
+					line++
+				}
+				ignored[lineKey{tf.Name(), line}] = true
+			}
+		}
+	}
+	return ignored, nil
+}
+
+func isIgnoreDirective(text string) bool {
+	rest, ok := strings.CutPrefix(text, "//dalivet:ignore")
+	return ok && (rest == "" || rest[0] == ' ' || rest[0] == '\t')
+}
+
+func (c *checker) reportf(pos token.Pos, format string, args ...any) {
+	p := c.pass.Fset.PositionFor(pos, false)
+	if c.ignored[lineKey{p.Filename, p.Line}] {
+		return
+	}
+	c.pass.Reportf(pos, format, args...)
+}
+
 // checkQueryMethods handles Check 1: One/All/ScanAllRows argument types.
 func (c *checker) checkQueryMethods(call *ast.CallExpr, method string) {
 	switch method {
@@ -124,11 +185,11 @@ func (c *checker) checkOneArg(arg ast.Expr) {
 	}
 	ptr, ok := deref(t)
 	if !ok {
-		c.pass.Reportf(arg.Pos(), "One requires a pointer to a struct, got %s", t)
+		c.reportf(arg.Pos(), "One requires a pointer to a struct, got %s", t)
 		return
 	}
 	if !skipTypeCheck(ptr) && !isStruct(ptr) {
-		c.pass.Reportf(arg.Pos(), "One requires a pointer to a struct, got %s", t)
+		c.reportf(arg.Pos(), "One requires a pointer to a struct, got %s", t)
 	}
 }
 
@@ -140,13 +201,13 @@ func (c *checker) checkAllArg(arg ast.Expr) {
 	}
 	ptr, ok := deref(t)
 	if !ok {
-		c.pass.Reportf(arg.Pos(), "All requires a pointer to a slice of structs, got %s", t)
+		c.reportf(arg.Pos(), "All requires a pointer to a slice of structs, got %s", t)
 		return
 	}
 	sl, ok := ptr.Underlying().(*types.Slice)
 	if !ok {
 		if !skipTypeCheck(ptr) {
-			c.pass.Reportf(arg.Pos(), "All requires a pointer to a slice of structs, got %s", t)
+			c.reportf(arg.Pos(), "All requires a pointer to a slice of structs, got %s", t)
 		}
 		return
 	}
@@ -155,12 +216,12 @@ func (c *checker) checkAllArg(arg ast.Expr) {
 		elem = p
 		// Check for **Struct.
 		if _, isPtr2 := deref(elem); isPtr2 {
-			c.pass.Reportf(arg.Pos(), "All does not allow pointer to pointer as slice element, got %s", t)
+			c.reportf(arg.Pos(), "All does not allow pointer to pointer as slice element, got %s", t)
 			return
 		}
 	}
 	if !skipTypeCheck(elem) && !isStruct(elem) {
-		c.pass.Reportf(arg.Pos(), "All requires a pointer to a slice of structs, got %s", t)
+		c.reportf(arg.Pos(), "All requires a pointer to a slice of structs, got %s", t)
 	}
 }
 
@@ -172,12 +233,12 @@ func (c *checker) checkScanAllRowsArg(arg ast.Expr) {
 	}
 	ptr, ok := deref(t)
 	if !ok {
-		c.pass.Reportf(arg.Pos(), "ScanAllRows requires a pointer to a slice, got %s", t)
+		c.reportf(arg.Pos(), "ScanAllRows requires a pointer to a slice, got %s", t)
 		return
 	}
 	if _, ok := ptr.Underlying().(*types.Slice); !ok {
 		if !skipTypeCheck(ptr) {
-			c.pass.Reportf(arg.Pos(), "ScanAllRows requires a pointer to a slice, got %s", t)
+			c.reportf(arg.Pos(), "ScanAllRows requires a pointer to a slice, got %s", t)
 		}
 	}
 }
@@ -208,25 +269,25 @@ func (c *checker) checkDBTxMethods(call *ast.CallExpr, method, typeName string, 
 	queryExpr := call.Args[queryArgIdx]
 	tv, ok := c.pass.TypesInfo.Types[queryExpr]
 	if !ok || tv.Value == nil || tv.Value.Kind() != constant.String {
-		c.pass.Reportf(queryExpr.Pos(), "%s.%s requires a constant query string", typeName, method)
+		c.reportf(queryExpr.Pos(), "%s.%s requires a constant query string", typeName, method)
 		return
 	}
 	query := constant.StringVal(tv.Value)
 
 	phs, err := parsePlaceholders(query)
 	if err != nil {
-		c.pass.Reportf(queryExpr.Pos(), "%v", err)
+		c.reportf(queryExpr.Pos(), "%v", err)
 		return
 	}
 
 	// Check 4: invalid placeholders and prepare restrictions.
 	for _, ph := range phs {
 		if !isValidPlaceholder(ph.Type) {
-			c.pass.Reportf(queryExpr.Pos(), "unknown placeholder ?%s", ph.Type)
+			c.reportf(queryExpr.Pos(), "unknown placeholder ?%s", ph.Type)
 			return
 		}
 		if ph.Expand && !isExpandable(ph.Type) {
-			c.pass.Reportf(queryExpr.Pos(), "?%s cannot be expanded (...)", ph.Type)
+			c.reportf(queryExpr.Pos(), "?%s cannot be expanded (...)", ph.Type)
 			return
 		}
 		if isPrepare {
@@ -236,13 +297,13 @@ func (c *checker) checkDBTxMethods(call *ast.CallExpr, method, typeName string, 
 			}
 			switch {
 			case ph.Type == "" && ph.Expand: // ?...
-				c.pass.Reportf(queryExpr.Pos(), "%s cannot be used in prepared statements", name)
+				c.reportf(queryExpr.Pos(), "%s cannot be used in prepared statements", name)
 				return
 			case ph.Type == "values":
-				c.pass.Reportf(queryExpr.Pos(), "%s cannot be used in prepared statements", name)
+				c.reportf(queryExpr.Pos(), "%s cannot be used in prepared statements", name)
 				return
 			case ph.Type == "set":
-				c.pass.Reportf(queryExpr.Pos(), "%s cannot be used in prepared statements", name)
+				c.reportf(queryExpr.Pos(), "%s cannot be used in prepared statements", name)
 				return
 			}
 		}
@@ -263,7 +324,7 @@ func (c *checker) checkDBTxMethods(call *ast.CallExpr, method, typeName string, 
 		return
 	}
 	if gotArgs != wantArgs {
-		c.pass.Reportf(call.Pos(), "%s.%s has %d placeholder(s) but %d arg(s)",
+		c.reportf(call.Pos(), "%s.%s has %d placeholder(s) but %d arg(s)",
 			typeName, method, wantArgs, gotArgs)
 		return
 	}
@@ -282,11 +343,11 @@ func (c *checker) checkDBTxMethods(call *ast.CallExpr, method, typeName string, 
 			switch a := arg.(type) {
 			case *ast.CompositeLit:
 				if len(a.Elts) == 0 {
-					c.pass.Reportf(arg.Pos(), "empty slice passed to ?%s...", ph.Type)
+					c.reportf(arg.Pos(), "empty slice passed to ?%s...", ph.Type)
 				}
 			case *ast.Ident, *ast.SelectorExpr, *ast.CallExpr:
 				if !isSliceGuarded(c.pass.TypesInfo, stack, a) {
-					c.pass.Reportf(arg.Pos(),
+					c.reportf(arg.Pos(),
 						"slice %q passed to ?%s... without a length check", types.ExprString(a), ph.Type)
 				}
 			}
@@ -329,15 +390,15 @@ func (c *checker) checkPlaceholderType(arg ast.Expr, ph Placeholder, argType typ
 		switch ph.Type {
 		case "": // ?...
 			if !isSlice(argType) {
-				c.pass.Reportf(arg.Pos(), "?... requires a slice, got %s", argType)
+				c.reportf(arg.Pos(), "?... requires a slice, got %s", argType)
 			}
 		case "ident": // ?ident...
 			if !isStringSlice(argType) {
-				c.pass.Reportf(arg.Pos(), "?ident... requires []string, got %s", argType)
+				c.reportf(arg.Pos(), "?ident... requires []string, got %s", argType)
 			}
 		case "values": // ?values...
 			if !isSliceOfStructs(argType) {
-				c.pass.Reportf(arg.Pos(), "?values... requires a slice of structs, got %s", argType)
+				c.reportf(arg.Pos(), "?values... requires a slice of structs, got %s", argType)
 			}
 		}
 		return
@@ -348,7 +409,7 @@ func (c *checker) checkPlaceholderType(arg ast.Expr, ph Placeholder, argType typ
 		c.checkScalarArg(arg, argType)
 	case "ident": // ?ident
 		if !isString(argType) {
-			c.pass.Reportf(arg.Pos(), "?ident requires a string, got %s", argType)
+			c.reportf(arg.Pos(), "?ident requires a string, got %s", argType)
 		}
 	case "values": // ?values
 		c.checkStructOrMap(arg, argType, "?values")
@@ -356,7 +417,7 @@ func (c *checker) checkPlaceholderType(arg ast.Expr, ph Placeholder, argType typ
 		c.checkStructOrMap(arg, argType, "?set")
 	case "sql": // ?sql
 		if !isString(argType) && !implementsMarshaler(argType) {
-			c.pass.Reportf(arg.Pos(), "?sql requires a string or dali.Marshaler, got %s", argType)
+			c.reportf(arg.Pos(), "?sql requires a string or dali.Marshaler, got %s", argType)
 		}
 	}
 }
@@ -379,14 +440,14 @@ func (c *checker) checkScalarArg(arg ast.Expr, t types.Type) {
 		if elem, ok := u.Elem().(*types.Basic); ok && elem.Kind() == types.Byte {
 			return
 		}
-		c.pass.Reportf(arg.Pos(), "? does not accept slices (except []byte), got %s", t)
+		c.reportf(arg.Pos(), "? does not accept slices (except []byte), got %s", t)
 	case *types.Struct:
 		if c.isTimeConvertible(t) {
 			return
 		}
-		c.pass.Reportf(arg.Pos(), "? does not accept structs (except time.Time-convertible or driver.Valuer), got %s", t)
+		c.reportf(arg.Pos(), "? does not accept structs (except time.Time-convertible or driver.Valuer), got %s", t)
 	default:
-		c.pass.Reportf(arg.Pos(), "? does not accept %s", t)
+		c.reportf(arg.Pos(), "? does not accept %s", t)
 	}
 }
 
@@ -401,7 +462,7 @@ func (c *checker) checkStructOrMap(arg ast.Expr, t types.Type, placeholder strin
 	if isStruct(t) {
 		return
 	}
-	c.pass.Reportf(arg.Pos(), "%s requires a struct or dali.Map, got %s", placeholder, orig)
+	c.reportf(arg.Pos(), "%s requires a struct or dali.Map, got %s", placeholder, orig)
 }
 
 func (c *checker) isTimeConvertible(t types.Type) bool {
