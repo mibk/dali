@@ -26,7 +26,8 @@ func (q *Query) One(dest any) error {
 // All executes the query that should return rows, and loads the
 // resulting data into dest which must be a slice of structs.
 // Only fields that match the column names (after filtering through
-// the mapperFunc) are filled.
+// the mapperFunc) are filled. All appends the rows to dest
+// and does not reset it first, so it keeps any elements it already holds.
 func (q *Query) All(dest any) error {
 	const errMsg = "dali: dest must be a pointer to a slice of structs or pointers to structs"
 	destv := reflect.ValueOf(dest)
@@ -57,8 +58,6 @@ func (q *Query) loadStruct(v reflect.Value) error { return q.load(v, v.Type(), t
 func (q *Query) loadStructs(slicev reflect.Value, elemt reflect.Type, isPtr bool) error {
 	err := q.load(slicev, elemt, false, isPtr)
 	if err == sql.ErrNoRows {
-		slicev.SetLen(0)
-		slicev.SetCap(0)
 		return nil
 	}
 	return err
@@ -134,7 +133,8 @@ func (q *Query) load(v reflect.Value, elemt reflect.Type, loadJustOne, isPtr boo
 
 // ScanAllRows executes the query that is expected to return rows.
 // It copies the columns from the matched rows into the slices
-// pointed at by dests.
+// pointed at by dests. Like All, it appends to the slices
+// and does not reset them first.
 func (q *Query) ScanAllRows(dests ...any) error {
 	slicevals := make([]reflect.Value, len(dests))
 	elemtypes := make([]reflect.Type, len(dests))
@@ -156,9 +156,7 @@ func (q *Query) ScanAllRows(dests ...any) error {
 	defer rows.Close()
 	elemvptrs := make([]reflect.Value, len(dests))
 	args := make([]any, len(dests))
-	noRows := true
 	for rows.Next() {
-		noRows = false
 		for i := range args {
 			elemvptrs[i] = reflect.New(elemtypes[i])
 			args[i] = elemvptrs[i].Interface()
@@ -170,14 +168,5 @@ func (q *Query) ScanAllRows(dests ...any) error {
 			slicevals[i].Set(reflect.Append(slicevals[i], reflect.Indirect(elemvptrs[i])))
 		}
 	}
-	if err := rows.Err(); err != nil {
-		return err
-	}
-	if noRows {
-		for _, slicev := range slicevals {
-			slicev.SetLen(0)
-			slicev.SetCap(0)
-		}
-	}
-	return nil
+	return rows.Err()
 }

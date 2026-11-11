@@ -171,30 +171,41 @@ func TestNoRows(t *testing.T) {
 	if err := db.Query("").All(&rows); err != nil {
 		t.Errorf("unexpected err: %v", err)
 	}
-	if len(rows) != 0 {
-		t.Errorf("len(rows) must be 0, got %d", len(rows))
-	}
-	if cap(rows) != 0 {
-		t.Errorf("cap(rows) must be 0, got %d", cap(rows))
+	if len(rows) != 2 {
+		t.Errorf("All must leave dest untouched: len(rows) = %d, want 2", len(rows))
 	}
 
-	vals := []struct{}{{}, {}}
-	vals2 := vals
-	if err := db.Query("").ScanAllRows(&vals, &vals2); err != nil {
+	ids := []int64{9}
+	names := []string{"Old"}
+	if err := db.Query("").ScanAllRows(&ids, &names); err != nil {
 		t.Errorf("unexpected err: %v", err)
 	}
-	if len(vals) != 0 {
-		t.Errorf("len(vals) must be 0, got %d", len(vals))
+	if len(ids) != 1 || len(names) != 1 {
+		t.Errorf("ScanAllRows must leave dests untouched: got %v, %v", ids, names)
 	}
-	if cap(vals) != 0 {
-		t.Errorf("cap(vals) must be 0, got %d", cap(vals))
+}
+
+func TestLoadAppends(t *testing.T) {
+	dvr.SetColumns("ID", "Name").SetResult(U{1, "David"})
+
+	us := []U{{9, "Old"}}
+	if err := db.Query("").All(&us); err != nil {
+		t.Fatal(err)
+	}
+	if exp := []U{{9, "Old"}, {1, "David"}}; !reflect.DeepEqual(us, exp) {
+		t.Errorf("All: got %v, want %v", us, exp)
 	}
 
-	if len(vals2) != 0 {
-		t.Errorf("len(vals2) must be 0, got %d", len(vals2))
+	ids := []int64{9}
+	names := []string{"Old"}
+	if err := db.Query("").ScanAllRows(&ids, &names); err != nil {
+		t.Fatal(err)
 	}
-	if cap(vals2) != 0 {
-		t.Errorf("cap(vals2) must be 0, got %d", cap(vals2))
+	if exp := []int64{9, 1}; !reflect.DeepEqual(ids, exp) {
+		t.Errorf("ScanAllRows ids: got %v, want %v", ids, exp)
+	}
+	if exp := []string{"Old", "David"}; !reflect.DeepEqual(names, exp) {
+		t.Errorf("ScanAllRows names: got %v, want %v", names, exp)
 	}
 }
 
