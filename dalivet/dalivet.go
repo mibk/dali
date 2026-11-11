@@ -1095,25 +1095,23 @@ func isTerminatingCall(call *ast.CallExpr) bool {
 	return false
 }
 
+// hasMethod looks only at the method set of t itself:
+// the runtime sees a copy of the value in an interface,
+// which lacks the methods declared on *t.
 func hasMethod(t types.Type, name string, params, results int) bool {
-	// Check both value and pointer receiver method sets.
-	for _, ms := range []*types.MethodSet{
-		types.NewMethodSet(t),
-		types.NewMethodSet(types.NewPointer(t)),
-	} {
-		for i := 0; i < ms.Len(); i++ {
-			sel := ms.At(i)
-			if sel.Obj().Name() != name {
-				continue
-			}
-			fn, ok := sel.Obj().(*types.Func)
-			if !ok {
-				continue
-			}
-			sig := fn.Type().(*types.Signature)
-			if sig.Params().Len() == params && sig.Results().Len() == results {
-				return true
-			}
+	ms := types.NewMethodSet(t)
+	for i := 0; i < ms.Len(); i++ {
+		sel := ms.At(i)
+		if sel.Obj().Name() != name {
+			continue
+		}
+		fn, ok := sel.Obj().(*types.Func)
+		if !ok {
+			continue
+		}
+		sig := fn.Type().(*types.Signature)
+		if sig.Params().Len() == params && sig.Results().Len() == results {
+			return true
 		}
 	}
 	return false

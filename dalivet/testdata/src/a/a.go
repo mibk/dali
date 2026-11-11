@@ -447,6 +447,21 @@ func checkValuer(db *dali.DB) {
 	db.Query("SELECT ?", v) // OK: implements driver.Valuer
 }
 
+type PtrValuer struct{}
+
+func (*PtrValuer) Value() (driver.Value, error) { return nil, nil }
+
+type PtrMarshaler struct{}
+
+func (*PtrMarshaler) MarshalSQL(t dali.Translator) (string, error) { return "1", nil }
+
+func checkPointerReceiverMethods(db *dali.DB) {
+	db.Query("SELECT ?", &PtrValuer{})       // OK
+	db.Query("SELECT ?", PtrValuer{})        // want `\? does not accept structs`
+	db.Query("SELECT ?sql", &PtrMarshaler{}) // OK
+	db.Query("SELECT ?sql", PtrMarshaler{})  // want `\?sql requires a string or dali\.Marshaler, got a\.PtrMarshaler`
+}
+
 func checkInterface(q *dali.Query) {
 	var x any
 	q.One(x) // OK: interface, skip check
