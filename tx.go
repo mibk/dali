@@ -67,7 +67,7 @@ func (tx *Tx) Prepare(query string, args ...any) (*Stmt, error) {
 	return tx.PrepareContext(context.Background(), query, args...)
 }
 
-// Stmt returns a transaction-specific prepared statement from an
+// StmtContext returns a transaction-specific prepared statement from an
 // existing statement.
 //
 // The provided context is used for the preparation of the statement,

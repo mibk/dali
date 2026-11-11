@@ -38,9 +38,13 @@
 //		name    string
 //		groupID int64
 //	)
-//	stmt := db.Prepare(`SELECT ?ident... FROM [user] WHERE [id] = ?`, cols)
+//	stmt, err := db.Prepare(`SELECT ?ident... FROM [user] WHERE [id] = ?`, cols)
+//	if err != nil {
+//		return err
+//	}
+//	defer stmt.Close()
 //	// This prepares this statement:
 //	//	SELECT `name`, `group_id` FROM `user` WHERE `id` = ?
-//	stmt.Bind(14).ScanRow(&name, &groupID)
+//	err = stmt.Bind(14).ScanRow(&name, &groupID)
 //	// Bind the statement with 14 value and scan the row into these variables.
 package dali

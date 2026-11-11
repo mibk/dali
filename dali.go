@@ -168,5 +168,5 @@ func LastInsertID(res sql.Result, err error) (int64, error) {
 	return res.LastInsertId()
 }
 
-// Map is just an alias for map[string]interface{}.
+// Map maps column names to values for the ?values and ?set placeholders.
 type Map map[string]any
