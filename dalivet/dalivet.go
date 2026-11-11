@@ -797,6 +797,9 @@ func blockGuardsSlice(info *types.Info, block *ast.BlockStmt, callStmt ast.Node,
 	if hasBailoutGuard(info, block.List, callStmt, name) {
 		return true
 	}
+	if holdsNonEmptyLit(block.List, callStmt, name) {
+		return true
+	}
 	// Pattern C: name is appended to inside for range X, and X has a
 	// bail-out guard earlier in the block.
 	// Pattern D: name := make([]T, len(X)) and X has a bail-out guard.
@@ -825,6 +828,67 @@ func blockGuardsSlice(info *types.Info, block *ast.BlockStmt, callStmt ast.Node,
 		}
 	}
 	return false
+}
+
+// holdsNonEmptyLit reports whether the last assignment to name in stmts
+// (up to, not including, before) stores a non-empty slice literal.
+// Appending to name or passing it through a non-empty-preserving call
+// keeps it non-empty.
+func holdsNonEmptyLit(stmts []ast.Stmt, before ast.Node, name string) bool {
+	nonEmpty := false
+	for _, stmt := range stmts {
+		if stmt == before {
+			break
+		}
+		switch s := stmt.(type) {
+		case *ast.AssignStmt:
+			for i, lhs := range s.Lhs {
+				if exprName(lhs) != name {
+					continue
+				}
+				if len(s.Lhs) != len(s.Rhs) {
+					nonEmpty = false
+					continue
+				}
+				rhs := s.Rhs[i]
+				nonEmpty = isNonEmptySliceLit(rhs) || nonEmpty && keepsNonEmpty(rhs, name)
+			}
+		case *ast.DeclStmt:
+			gen, ok := s.Decl.(*ast.GenDecl)
+			if !ok || gen.Tok != token.VAR {
+				continue
+			}
+			for _, spec := range gen.Specs {
+				vs := spec.(*ast.ValueSpec)
+				for i, id := range vs.Names {
+					if id.Name == name {
+						nonEmpty = len(vs.Values) == len(vs.Names) && isNonEmptySliceLit(vs.Values[i])
+					}
+				}
+			}
+		}
+	}
+	return nonEmpty
+}
+
+func isNonEmptySliceLit(expr ast.Expr) bool {
+	lit, ok := expr.(*ast.CompositeLit)
+	if !ok || len(lit.Elts) == 0 {
+		return false
+	}
+	arr, ok := lit.Type.(*ast.ArrayType)
+	return ok && arr.Len == nil
+}
+
+// keepsNonEmpty reports whether expr is non-empty whenever name is,
+// as in append(name, ...) or slices.Compact(name).
+func keepsNonEmpty(expr ast.Expr, name string) bool {
+	if call, ok := expr.(*ast.CallExpr); ok && len(call.Args) > 0 {
+		if fn, ok := call.Fun.(*ast.Ident); ok && fn.Name == "append" {
+			return exprName(call.Args[0]) == name
+		}
+	}
+	return traceCallSource(expr) == name
 }
 
 // hasBailoutGuard reports whether stmts (up to, not including, before)

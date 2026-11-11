@@ -145,87 +145,74 @@ func checkEmptySliceLiteral(db *dali.DB) {
 	db.Query("SELECT ?...", []int{1})        // OK
 }
 
-func checkUnguardedSlice(db *dali.DB) {
-	items := []int{1, 2}
-	db.Query("SELECT ?...", items) // want `slice "items" passed to \?\.\.\. without a length check`
-
-	idents := []string{"a"}
+func checkUnguardedSlice(db *dali.DB, items []int, idents []string) {
+	db.Query("SELECT ?...", items)       // want `slice "items" passed to \?\.\.\. without a length check`
 	db.Query("SELECT ?ident...", idents) // want `slice "idents" passed to \?ident\.\.\. without a length check`
 }
 
-func checkGuardedBailout(db *dali.DB) {
-	items := []int{1, 2}
+func checkGuardedBailout(db *dali.DB, items []int) {
 	if len(items) == 0 {
 		return
 	}
 	db.Query("SELECT ?...", items) // OK
 }
 
-func checkGuardedBailoutPanic(db *dali.DB) {
-	items := []int{1, 2}
+func checkGuardedBailoutPanic(db *dali.DB, items []int) {
 	if len(items) == 0 {
 		panic("unreachable")
 	}
 	db.Query("SELECT ?...", items) // OK
 }
 
-func checkGuardedBailoutOr(db *dali.DB, ok bool) {
-	items := []int{1, 2}
+func checkGuardedBailoutOr(db *dali.DB, ok bool, items []int) {
 	if len(items) == 0 || !ok {
 		return
 	}
 	db.Query("SELECT ?...", items) // OK
 }
 
-func checkUnguardedBailoutAnd(db *dali.DB, ok bool) {
-	items := []int{1, 2}
+func checkUnguardedBailoutAnd(db *dali.DB, ok bool, items []int) {
 	if len(items) == 0 && !ok {
 		return
 	}
 	db.Query("SELECT ?...", items) // want `slice "items" passed to \?\.\.\. without a length check`
 }
 
-func checkGuardedBailoutLogFatal(db *dali.DB) {
-	items := []int{1, 2}
+func checkGuardedBailoutLogFatal(db *dali.DB, items []int) {
 	if len(items) == 0 {
 		log.Fatal("no items")
 	}
 	db.Query("SELECT ?...", items) // OK
 }
 
-func checkGuardedBailoutOsExit(db *dali.DB) {
-	items := []int{1, 2}
+func checkGuardedBailoutOsExit(db *dali.DB, items []int) {
 	if len(items) == 0 {
 		os.Exit(1)
 	}
 	db.Query("SELECT ?...", items) // OK
 }
 
-func checkGuardedBailoutTestingSkip(t *testing.T, db *dali.DB) {
-	items := []int{1, 2}
+func checkGuardedBailoutTestingSkip(t *testing.T, db *dali.DB, items []int) {
 	if len(items) == 0 {
 		t.Skip("no items")
 	}
 	db.Query("SELECT ?...", items) // OK
 }
 
-func checkUnguardedBailoutLogPrint(db *dali.DB) {
-	items := []int{1, 2}
+func checkUnguardedBailoutLogPrint(db *dali.DB, items []int) {
 	if len(items) == 0 {
 		log.Print("no items")
 	}
 	db.Query("SELECT ?...", items) // want `slice "items" passed to \?\.\.\. without a length check`
 }
 
-func checkGuardedPositive(db *dali.DB) {
-	items := []int{1, 2}
+func checkGuardedPositive(db *dali.DB, items []int) {
 	if len(items) > 0 {
 		db.Query("SELECT ?...", items) // OK
 	}
 }
 
-func checkUnguardedPositiveElse(db *dali.DB) {
-	items := []int{1, 2}
+func checkUnguardedPositiveElse(db *dali.DB, items []int) {
 	if len(items) > 0 {
 	} else {
 		db.Query("SELECT ?...", items) // want `slice "items" passed to \?\.\.\. without a length check`
@@ -236,23 +223,20 @@ func checkUnguardedPositiveElse(db *dali.DB) {
 	}
 }
 
-func checkGuardedNotEqual(db *dali.DB) {
-	items := []int{1, 2}
+func checkGuardedNotEqual(db *dali.DB, items []int) {
 	if len(items) != 0 {
 		db.Query("SELECT ?...", items) // OK
 	}
 }
 
-func checkGuardedDefault(db *dali.DB) {
-	items := []int64{1, 2}
+func checkGuardedDefault(db *dali.DB, items []int64) {
 	if len(items) == 0 {
 		items = []int64{-1}
 	}
 	db.Query("SELECT ?...", items) // OK
 }
 
-func checkGuardedCompound(db *dali.DB) {
-	items := []int{1, 2}
+func checkGuardedCompound(db *dali.DB, items []int) {
 	var id *int
 	if id != nil && len(items) > 0 {
 		db.Query("SELECT ?...", items) // OK
@@ -260,8 +244,7 @@ func checkGuardedCompound(db *dali.DB) {
 	_ = id
 }
 
-func checkGuardedLessThanOne(db *dali.DB) {
-	items := []int{1, 2}
+func checkGuardedLessThanOne(db *dali.DB, items []int) {
 	if len(items) < 1 {
 		return
 	}
@@ -312,8 +295,7 @@ func checkUnguardedElseIfNonTerminating(db *dali.DB) {
 
 func makeItems() ([]int, error) { return nil, nil }
 
-func checkGuardedInClosure(db *dali.DB) {
-	items := []int{1, 2}
+func checkGuardedInClosure(db *dali.DB, items []int) {
 	if len(items) == 0 {
 		return
 	}
@@ -323,8 +305,7 @@ func checkGuardedInClosure(db *dali.DB) {
 	f()
 }
 
-func checkGuardedTransitiveRange(db *dali.DB) {
-	items := []int{1, 2}
+func checkGuardedTransitiveRange(db *dali.DB, items []int) {
 	if len(items) == 0 {
 		return
 	}
@@ -335,8 +316,7 @@ func checkGuardedTransitiveRange(db *dali.DB) {
 	db.Query("SELECT ?...", ids) // OK
 }
 
-func checkGuardedTransitiveRangeCompact(db *dali.DB) {
-	items := []int{1, 2}
+func checkGuardedTransitiveRangeCompact(db *dali.DB, items []int) {
 	if len(items) == 0 {
 		return
 	}
@@ -348,8 +328,7 @@ func checkGuardedTransitiveRangeCompact(db *dali.DB) {
 	db.Query("SELECT ?...", ids) // OK
 }
 
-func checkGuardedTransitiveRangeNestedBlock(db *dali.DB) {
-	items := []int{1, 2}
+func checkGuardedTransitiveRangeNestedBlock(db *dali.DB, items []int) {
 	if len(items) == 0 {
 		return
 	}
@@ -363,8 +342,7 @@ func checkGuardedTransitiveRangeNestedBlock(db *dali.DB) {
 	}
 }
 
-func checkUnguardedTransitiveRange(db *dali.DB) {
-	items := []int{1, 2}
+func checkUnguardedTransitiveRange(db *dali.DB, items []int) {
 	var ids []int64
 	for _, i := range items {
 		ids = append(ids, int64(i))
@@ -372,8 +350,7 @@ func checkUnguardedTransitiveRange(db *dali.DB) {
 	db.Query("SELECT ?...", ids) // want `slice "ids" passed to \?\.\.\. without a length check`
 }
 
-func checkUnguardedTransitiveRangeSwitchContinue(db *dali.DB) {
-	items := []int{1, 2}
+func checkUnguardedTransitiveRangeSwitchContinue(db *dali.DB, items []int) {
 	if len(items) == 0 {
 		return
 	}
@@ -388,8 +365,7 @@ func checkUnguardedTransitiveRangeSwitchContinue(db *dali.DB) {
 	db.Query("SELECT ?...", ids) // want `slice "ids" passed to \?\.\.\. without a length check`
 }
 
-func checkGuardedTransitiveRangeSwitchBreak(db *dali.DB) {
-	items := []int{1, 2}
+func checkGuardedTransitiveRangeSwitchBreak(db *dali.DB, items []int) {
 	if len(items) == 0 {
 		return
 	}
@@ -404,8 +380,7 @@ func checkGuardedTransitiveRangeSwitchBreak(db *dali.DB) {
 	db.Query("SELECT ?...", ids) // OK: break leaves only the switch
 }
 
-func checkGuardedTransitiveRangeLabeledSwitchBreak(db *dali.DB) {
-	items := []int{1, 2}
+func checkGuardedTransitiveRangeLabeledSwitchBreak(db *dali.DB, items []int) {
 	if len(items) == 0 {
 		return
 	}
@@ -421,8 +396,7 @@ func checkGuardedTransitiveRangeLabeledSwitchBreak(db *dali.DB) {
 	db.Query("SELECT ?...", ids) // OK: break L leaves only the switch
 }
 
-func checkGuardedMakeLen(db *dali.DB) {
-	items := []int{1, 2}
+func checkGuardedMakeLen(db *dali.DB, items []int) {
 	if len(items) == 0 {
 		return
 	}
@@ -433,8 +407,7 @@ func checkGuardedMakeLen(db *dali.DB) {
 	db.Query("SELECT ?...", ids) // OK
 }
 
-func checkUnguardedMakeLen(db *dali.DB) {
-	items := []int{1, 2}
+func checkUnguardedMakeLen(db *dali.DB, items []int) {
 	ids := make([]int64, len(items))
 	for i, v := range items {
 		ids[i] = int64(v)
@@ -505,8 +478,7 @@ func checkUnguardedDerived(db *dali.DB) {
 	db.Query("SELECT ?...", ids) // want `slice "ids" passed to \?\.\.\. without a length check`
 }
 
-func checkGuardedDerivedViaMapPopulation(db *dali.DB) {
-	items := []int{1, 2}
+func checkGuardedDerivedViaMapPopulation(db *dali.DB, items []int) {
 	if len(items) == 0 {
 		return
 	}
@@ -518,8 +490,7 @@ func checkGuardedDerivedViaMapPopulation(db *dali.DB) {
 	db.Query("SELECT ?...", ids) // OK
 }
 
-func checkGuardedDerivedViaMapPopulationClosure(db *dali.DB) {
-	items := []int{1, 2}
+func checkGuardedDerivedViaMapPopulationClosure(db *dali.DB, items []int) {
 	if len(items) == 0 {
 		return
 	}
@@ -582,8 +553,7 @@ func checkGuardedSelector(db *dali.DB) {
 	db.Query("SELECT ?...", v.IDs) // OK
 }
 
-func checkGuardedTransitiveSelector(db *dali.DB) {
-	items := []int{1, 2}
+func checkGuardedTransitiveSelector(db *dali.DB, items []int) {
 	if len(items) == 0 {
 		return
 	}
@@ -656,6 +626,29 @@ func checkIgnoreDirective(db *dali.DB, items []int) {
 	db.Query("SELECT ?...", items) // want `slice "items" passed to \?\.\.\. without a length check`
 	db.Query("SELECT 1")           //dalivet:ignore
 	db.Query("SELECT ?...", items) // want `slice "items" passed to \?\.\.\. without a length check`
+}
+
+func checkNonEmptyLiteral(db *dali.DB, id int64, items []int64) {
+	ids := []int64{id}
+	db.Query("SELECT ?...", ids) // OK
+
+	var names = []string{"a", "b"}
+	db.Query("SELECT ?ident...", names) // OK
+
+	more := []int64{id}
+	more = append(more, items...)
+	more = slices.Compact(more)
+	db.Query("SELECT ?...", more) // OK
+
+	empty := []int64{}
+	db.Query("SELECT ?...", empty) // want `slice "empty" passed to \?\.\.\. without a length check`
+
+	spread := []int64{id}
+	spread = items
+	db.Query("SELECT ?...", spread) // want `slice "spread" passed to \?\.\.\. without a length check`
+
+	var unset []int64
+	db.Query("SELECT ?...", unset) // want `slice "unset" passed to \?\.\.\. without a length check`
 }
 
 func checkRepeatedSlice(db *dali.DB, items, ids []int) {
