@@ -3,6 +3,7 @@ package dali
 import (
 	"context"
 	"database/sql"
+	"reflect"
 	"testing"
 )
 
@@ -48,6 +49,36 @@ func TestMiddleware(t *testing.T) {
 	checkmw("#4-query")
 	db.mustBegin().mustPrepare("#4").Bind().ScanRow()
 	checkmw("#4-queryrow")
+}
+
+func TestAddMiddlewareFunc(t *testing.T) {
+	t.Cleanup(func() {
+		db.SetMiddlewareFunc(func(e Execer) Execer { return e })
+	})
+	var order []string
+	add := func(name string) {
+		db.AddMiddlewareFunc(func(e Execer) Execer {
+			return &recorder{e, name, &order}
+		})
+	}
+	add("first")
+	add("second")
+
+	db.Query("#1").Exec()
+	if exp := []string{"second", "first"}; !reflect.DeepEqual(order, exp) {
+		t.Errorf("got %v, want %v", order, exp)
+	}
+}
+
+type recorder struct {
+	Execer
+	name  string
+	order *[]string
+}
+
+func (r *recorder) ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
+	*r.order = append(*r.order, r.name)
+	return r.Execer.ExecContext(ctx, query, args...)
 }
 
 type middle struct {

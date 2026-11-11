@@ -140,12 +140,21 @@ func (db *DB) Begin() (*Tx, error) {
 	return db.BeginTx(context.Background(), nil)
 }
 
-// SetMiddlewareFunc changes the DB middleware func. Default func
+// SetMiddlewareFunc replaces the DB middleware func. Default func
 // passes the Execer unchanged. SetMiddlewareFunc allows the user
 // to set a custom middleware to perform additional operations (e.g.
 // profiling) when executing queries.
 func (db *DB) SetMiddlewareFunc(f func(Execer) Execer) {
 	db.middleware = f
+}
+
+// AddMiddlewareFunc adds f on top of the current middleware func
+// instead of replacing it.
+// f wraps the Execer returned by the middleware added before it,
+// so f sees each query first.
+func (db *DB) AddMiddlewareFunc(f func(Execer) Execer) {
+	prev := db.middleware
+	db.middleware = func(e Execer) Execer { return f(prev(e)) }
 }
 
 // Execer is an interface that Query works with.
