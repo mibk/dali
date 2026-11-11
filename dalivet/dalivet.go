@@ -284,7 +284,7 @@ func (c *checker) checkDBTxMethods(call *ast.CallExpr, method, typeName string, 
 					c.pass.Reportf(arg.Pos(), "empty slice passed to ?%s...", ph.Type)
 				}
 			case *ast.Ident, *ast.SelectorExpr, *ast.CallExpr:
-				if !isSliceGuarded(stack, a) {
+				if !isSliceGuarded(c.pass.TypesInfo, stack, a) {
 					c.pass.Reportf(arg.Pos(),
 						"slice %q passed to ?%s... without a length check", types.ExprString(a), ph.Type)
 				}
@@ -640,7 +640,7 @@ func bodyWritesMapEntry(body *ast.BlockStmt, name string) bool {
 	return false
 }
 
-func isSliceGuarded(stack []ast.Node, expr ast.Expr) bool {
+func isSliceGuarded(info *types.Info, stack []ast.Node, expr ast.Expr) bool {
 	name := exprName(expr)
 	if _, ok := expr.(*ast.CallExpr); ok {
 		name = traceCallSource(expr)
@@ -650,10 +650,10 @@ func isSliceGuarded(stack []ast.Node, expr ast.Expr) bool {
 		// which cannot be length-checked without storing it first.
 		return true
 	}
-	return isSliceNameGuarded(stack, name, nil)
+	return isSliceNameGuarded(info, stack, name, nil)
 }
 
-func isSliceNameGuarded(stack []ast.Node, name string, visited map[string]bool) bool {
+func isSliceNameGuarded(info *types.Info, stack []ast.Node, name string, visited map[string]bool) bool {
 	// Pattern B: call inside if len(x) > 0 { ... } (positive guard).
 	// The len check may be one conjunct in a && chain.
 	// Extended: if the direct name doesn't match, trace the source of
@@ -691,7 +691,7 @@ func isSliceNameGuarded(stack []ast.Node, name string, visited map[string]bool) 
 			continue
 		}
 		callStmt := stack[i+1]
-		if blockGuardsSlice(block, callStmt, name) {
+		if blockGuardsSlice(info, block, callStmt, name) {
 			return true
 		}
 	}
@@ -715,7 +715,7 @@ func isSliceNameGuarded(stack []ast.Node, name string, visited map[string]bool) 
 			}
 			if !visited[src] {
 				visited[src] = true
-				if isSliceNameGuarded(stack, src, visited) {
+				if isSliceNameGuarded(info, stack, src, visited) {
 					return true
 				}
 			}
@@ -727,9 +727,9 @@ func isSliceNameGuarded(stack []ast.Node, name string, visited map[string]bool) 
 // blockGuardsSlice checks whether block contains a guard for name before
 // callStmt. It checks Pattern A (bail-out/default), Pattern C (for range +
 // append), and Pattern D (make with len).
-func blockGuardsSlice(block *ast.BlockStmt, callStmt ast.Node, name string) bool {
+func blockGuardsSlice(info *types.Info, block *ast.BlockStmt, callStmt ast.Node, name string) bool {
 	// Pattern A: bail-out or default-value preceding the call.
-	if hasBailoutGuard(block.List, callStmt, name) {
+	if hasBailoutGuard(info, block.List, callStmt, name) {
 		return true
 	}
 	// Pattern C: name is appended to inside for range X, and X has a
@@ -748,12 +748,12 @@ func blockGuardsSlice(block *ast.BlockStmt, callStmt ast.Node, name string) bool
 			if !bodyAppendsTo(s.Body, name) {
 				continue
 			}
-			if hasBailoutGuard(block.List, s, src) {
+			if hasBailoutGuard(info, block.List, s, src) {
 				return true
 			}
 		case *ast.AssignStmt:
 			if src := makeLenSource(s, name); src != "" {
-				if hasBailoutGuard(block.List, s, src) {
+				if hasBailoutGuard(info, block.List, s, src) {
 					return true
 				}
 			}
@@ -765,7 +765,7 @@ func blockGuardsSlice(block *ast.BlockStmt, callStmt ast.Node, name string) bool
 // hasBailoutGuard reports whether stmts (up to, not including, before)
 // contains an if statement whose condition is a zero-length guard on name
 // and whose body terminates or assigns a default value to name.
-func hasBailoutGuard(stmts []ast.Stmt, before ast.Node, name string) bool {
+func hasBailoutGuard(info *types.Info, stmts []ast.Stmt, before ast.Node, name string) bool {
 	for _, stmt := range stmts {
 		if stmt == before {
 			break
@@ -774,7 +774,7 @@ func hasBailoutGuard(stmts []ast.Stmt, before ast.Node, name string) bool {
 		if !ok {
 			continue
 		}
-		if ifChainGuardsSlice(ifStmt, name) {
+		if ifChainGuardsSlice(info, ifStmt, name) {
 			return true
 		}
 	}
@@ -785,16 +785,16 @@ func hasBailoutGuard(stmts []ast.Stmt, before ast.Node, name string) bool {
 // zero-length guard on name.  An else-if branch counts as a valid
 // guard when every preceding branch in the chain terminates, because
 // reaching code after the chain implies the guard condition was false.
-func ifChainGuardsSlice(ifStmt *ast.IfStmt, name string) bool {
+func ifChainGuardsSlice(info *types.Info, ifStmt *ast.IfStmt, name string) bool {
 	for {
-		if condHasZeroLenGuard(ifStmt.Cond, name) && (blockTerminates(ifStmt.Body) || blockAssigns(ifStmt.Body, name)) {
+		if condHasZeroLenGuard(ifStmt.Cond, name) && (blockTerminates(info, ifStmt.Body) || blockAssigns(ifStmt.Body, name)) {
 			return true
 		}
 		// Walk into the else-if chain only when the current body
 		// terminates — otherwise execution can fall through without
 		// the length ever being tested.
 		elseIf, ok := ifStmt.Else.(*ast.IfStmt)
-		if !ok || !blockTerminates(ifStmt.Body) {
+		if !ok || !blockTerminates(info, ifStmt.Body) {
 			return false
 		}
 		ifStmt = elseIf
@@ -1064,7 +1064,7 @@ func blockAssigns(block *ast.BlockStmt, name string) bool {
 	return false
 }
 
-func blockTerminates(block *ast.BlockStmt) bool {
+func blockTerminates(info *types.Info, block *ast.BlockStmt) bool {
 	if len(block.List) == 0 {
 		return false
 	}
@@ -1074,7 +1074,7 @@ func blockTerminates(block *ast.BlockStmt) bool {
 		return true
 	case *ast.ExprStmt:
 		if call, ok := s.X.(*ast.CallExpr); ok {
-			return isTerminatingCall(call)
+			return isTerminatingCall(info, call)
 		}
 	}
 	return false
@@ -1089,7 +1089,7 @@ var neverReturn = map[string]bool{
 	"FailNow": true, "Skip": true, "Skipf": true, "SkipNow": true,
 }
 
-func isTerminatingCall(call *ast.CallExpr) bool {
+func isTerminatingCall(info *types.Info, call *ast.CallExpr) bool {
 	switch fn := call.Fun.(type) {
 	case *ast.Ident:
 		return fn.Name == "panic"
