@@ -1,6 +1,9 @@
 package dalivet
 
-import "unicode/utf8"
+import (
+	"errors"
+	"unicode/utf8"
+)
 
 // Placeholder represents a parsed dali placeholder from a query string.
 type Placeholder struct {
@@ -10,7 +13,7 @@ type Placeholder struct {
 
 // parsePlaceholders extracts all ?-placeholders from a dali query string.
 // It mirrors the parsing loop in translate.go.
-func parsePlaceholders(query string) []Placeholder {
+func parsePlaceholders(query string) ([]Placeholder, error) {
 	var phs []Placeholder
 	pos := 0
 	for pos < len(query) {
@@ -22,7 +25,7 @@ func parsePlaceholders(query string) []Placeholder {
 			// Skip identifier escape.
 			w := indexRune(query[pos:], ']')
 			if w == -1 {
-				return phs
+				return nil, errors.New("identifier not terminated")
 			}
 			pos += w + 1
 		case '?':
@@ -46,7 +49,7 @@ func parsePlaceholders(query string) []Placeholder {
 			})
 		}
 	}
-	return phs
+	return phs, nil
 }
 
 func indexRune(s string, r rune) int {

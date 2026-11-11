@@ -211,7 +211,11 @@ func (c *checker) checkDBTxMethods(call *ast.CallExpr, method, typeName string, 
 	}
 	query := constant.StringVal(tv.Value)
 
-	phs := parsePlaceholders(query)
+	phs, err := parsePlaceholders(query)
+	if err != nil {
+		c.pass.Reportf(queryExpr.Pos(), "%v", err)
+		return
+	}
 
 	// Check 4: invalid placeholders and prepare restrictions.
 	for _, ph := range phs {

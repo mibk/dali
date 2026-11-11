@@ -104,6 +104,7 @@ func checkPlaceholderTypes(db *dali.DB) {
 
 func checkInvalidPlaceholders(db *dali.DB) {
 	db.Query("SELECT ?foo", 1) // want `unknown placeholder \?foo`
+	db.Query("SELECT [broken") // want `identifier not terminated`
 }
 
 func checkPrepareRestrictions(db *dali.DB) {

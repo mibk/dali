@@ -23,8 +23,6 @@ func TestParsePlaceholders(t *testing.T) {
 		{"SELECT ?sql FROM t", []Placeholder{{Type: "sql"}}},
 		// Unknown placeholder types are still parsed.
 		{"SELECT ?foo FROM t", []Placeholder{{Type: "foo"}}},
-		// Unterminated bracket — stops parsing.
-		{"SELECT [broken", nil},
 		// Placeholder at end of string.
 		{"SELECT ?", []Placeholder{{Type: ""}}},
 		// Mixed. Note: [?ident] is an identifier escape, not a placeholder.
@@ -39,10 +37,19 @@ func TestParsePlaceholders(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.query, func(t *testing.T) {
-			got := parsePlaceholders(tt.query)
+			got, err := parsePlaceholders(tt.query)
+			if err != nil {
+				t.Fatalf("parsePlaceholders(%q): %v", tt.query, err)
+			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("parsePlaceholders(%q):\n got %v\nwant %v", tt.query, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestParsePlaceholdersUnterminatedIdent(t *testing.T) {
+	if _, err := parsePlaceholders("SELECT ? [broken"); err == nil {
+		t.Error("want error for unterminated identifier")
 	}
 }
