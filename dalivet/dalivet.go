@@ -7,6 +7,7 @@ import (
 	"go/constant"
 	"go/token"
 	"go/types"
+	"slices"
 	"strconv"
 
 	"golang.org/x/tools/go/analysis"
@@ -826,19 +827,63 @@ func bodyAppendsTo(body *ast.BlockStmt, name string) bool {
 // are NOT counted because if a return fires the slice is never used,
 // so the non-empty guarantee still holds for reachable code.
 func stmtCanExit(stmt ast.Stmt) bool {
+	return stmtSkipsRest(stmt, nil)
+}
+
+// stmtSkipsRest is stmtCanExit for a statement inside the switch and select statements
+// whose labels are listed in switches ("" for an unlabeled one).
+// A break that targets one of them leaves only that statement.
+func stmtSkipsRest(stmt ast.Stmt, switches []string) bool {
 	switch s := stmt.(type) {
 	case *ast.BranchStmt:
-		return s.Tok == token.CONTINUE || s.Tok == token.BREAK
+		switch s.Tok {
+		case token.CONTINUE:
+			return true
+		case token.BREAK:
+			if s.Label == nil {
+				return len(switches) == 0
+			}
+			return !slices.Contains(switches, s.Label.Name)
+		}
+	case *ast.BlockStmt:
+		return listSkipsRest(s.List, switches)
 	case *ast.IfStmt:
-		return blockCanExit(s.Body) || (s.Else != nil && stmtCanExit(s.Else))
+		return listSkipsRest(s.Body.List, switches) || (s.Else != nil && stmtSkipsRest(s.Else, switches))
+	case *ast.LabeledStmt:
+		// A break can only target a labeled for, switch or select,
+		// and the walk never enters a for.
+		return stmtSkipsRest(s.Stmt, append(switches, s.Label.Name))
+	case *ast.SwitchStmt:
+		return clausesSkipRest(s.Body, switches)
+	case *ast.TypeSwitchStmt:
+		return clausesSkipRest(s.Body, switches)
+	case *ast.SelectStmt:
+		return clausesSkipRest(s.Body, switches)
 	}
 	return false
 }
 
-func blockCanExit(block *ast.BlockStmt) bool {
-	for _, stmt := range block.List {
-		if stmtCanExit(stmt) {
+func listSkipsRest(stmts []ast.Stmt, switches []string) bool {
+	for _, stmt := range stmts {
+		if stmtSkipsRest(stmt, switches) {
 			return true
+		}
+	}
+	return false
+}
+
+func clausesSkipRest(body *ast.BlockStmt, switches []string) bool {
+	switches = append(switches, "")
+	for _, clause := range body.List {
+		switch cl := clause.(type) {
+		case *ast.CaseClause:
+			if listSkipsRest(cl.Body, switches) {
+				return true
+			}
+		case *ast.CommClause:
+			if listSkipsRest(cl.Body, switches) {
+				return true
+			}
 		}
 	}
 	return false

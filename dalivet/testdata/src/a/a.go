@@ -302,6 +302,55 @@ func checkUnguardedTransitiveRange(db *dali.DB) {
 	db.Query("SELECT ?...", ids) // want `slice "ids" passed to \?\.\.\. without a length check`
 }
 
+func checkUnguardedTransitiveRangeSwitchContinue(db *dali.DB) {
+	items := []int{1, 2}
+	if len(items) == 0 {
+		return
+	}
+	var ids []int64
+	for _, i := range items {
+		switch {
+		case i < 0:
+			continue
+		}
+		ids = append(ids, int64(i))
+	}
+	db.Query("SELECT ?...", ids) // want `slice "ids" passed to \?\.\.\. without a length check`
+}
+
+func checkGuardedTransitiveRangeSwitchBreak(db *dali.DB) {
+	items := []int{1, 2}
+	if len(items) == 0 {
+		return
+	}
+	var ids []int64
+	for _, i := range items {
+		switch {
+		case i < 0:
+			break
+		}
+		ids = append(ids, int64(i))
+	}
+	db.Query("SELECT ?...", ids) // OK: break leaves only the switch
+}
+
+func checkGuardedTransitiveRangeLabeledSwitchBreak(db *dali.DB) {
+	items := []int{1, 2}
+	if len(items) == 0 {
+		return
+	}
+	var ids []int64
+	for _, i := range items {
+	L:
+		switch {
+		case i < 0:
+			break L
+		}
+		ids = append(ids, int64(i))
+	}
+	db.Query("SELECT ?...", ids) // OK: break L leaves only the switch
+}
+
 func checkGuardedMakeLen(db *dali.DB) {
 	items := []int{1, 2}
 	if len(items) == 0 {
