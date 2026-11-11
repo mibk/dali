@@ -568,3 +568,54 @@ func checkGenericPointer[T any](db *dali.DB, rows []*T) {
 	}
 	db.Query("INSERT ?values...", rows) // OK: T is unknown
 }
+
+func checkUnguardedSelector(db *dali.DB) {
+	var v struct{ IDs []int }
+	db.Query("SELECT ?...", v.IDs) // want `slice "v.IDs" passed to \?\.\.\. without a length check`
+}
+
+func checkGuardedSelector(db *dali.DB) {
+	var v struct{ IDs []int }
+	if len(v.IDs) == 0 {
+		return
+	}
+	db.Query("SELECT ?...", v.IDs) // OK
+}
+
+func checkGuardedTransitiveSelector(db *dali.DB) {
+	items := []int{1, 2}
+	if len(items) == 0 {
+		return
+	}
+	var v struct{ IDs []int }
+	for _, i := range items {
+		v.IDs = append(v.IDs, i)
+	}
+	db.Query("SELECT ?...", v.IDs) // OK
+}
+
+func checkUnguardedDerivedCall(db *dali.DB, m map[int]bool) {
+	db.Query("SELECT ?...", slices.Sorted(maps.Keys(m))) // want `slice "slices.Sorted\(maps.Keys\(m\)\)" passed to \?\.\.\. without a length check`
+}
+
+func checkGuardedDerivedCall(db *dali.DB, v struct{ M map[int]bool }) {
+	if len(v.M) > 0 {
+		db.Query("SELECT ?...", slices.Sorted(maps.Keys(v.M))) // OK
+	}
+}
+
+func checkUntraceableCall(db *dali.DB) {
+	ids, _ := makeItems()
+	db.Query("SELECT ?...", slices.Clip(ids[:1])) // OK: cannot be checked without storing it
+}
+
+func checkSelectorAssignedFromGuarded(db *dali.DB, m map[int]bool, items []int) {
+	if len(m) == 0 || len(items) == 0 {
+		return
+	}
+	var v struct{ IDs, Pos []int }
+	v.IDs = slices.Sorted(maps.Keys(m))
+	db.Query("SELECT ?...", v.IDs) // OK
+	v.Pos = make([]int, len(items))
+	db.Query("SELECT ?...", v.Pos) // OK
+}

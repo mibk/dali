@@ -283,10 +283,10 @@ func (c *checker) checkDBTxMethods(call *ast.CallExpr, method, typeName string, 
 				if len(a.Elts) == 0 {
 					c.pass.Reportf(arg.Pos(), "empty slice passed to ?%s...", ph.Type)
 				}
-			case *ast.Ident:
+			case *ast.Ident, *ast.SelectorExpr, *ast.CallExpr:
 				if !isSliceGuarded(stack, a) {
 					c.pass.Reportf(arg.Pos(),
-						"slice %q passed to ?%s... without a length check", a.Name, ph.Type)
+						"slice %q passed to ?%s... without a length check", types.ExprString(a), ph.Type)
 				}
 			}
 		}
@@ -523,7 +523,7 @@ var nonEmptyPreserving = map[string]map[string]bool{
 }
 
 // traceCallSource peels nested calls to known non-empty-preserving stdlib
-// functions and returns the innermost identifier name. For example, given
+// functions and returns the innermost name (see exprName). For example, given
 // slices.Sorted(maps.Keys(m)) it returns "m".
 func traceCallSource(expr ast.Expr) string {
 	for {
@@ -545,10 +545,7 @@ func traceCallSource(expr ast.Expr) string {
 		}
 		expr = call.Args[0]
 	}
-	if id, ok := expr.(*ast.Ident); ok {
-		return id.Name
-	}
-	return ""
+	return exprName(expr)
 }
 
 // traceSliceSource scans stmts for an assignment to name whose RHS traces
@@ -560,8 +557,7 @@ func traceSliceSource(stmts []ast.Stmt, name string) string {
 		if !ok || len(assign.Lhs) != 1 || len(assign.Rhs) != 1 {
 			continue
 		}
-		lhs, ok := assign.Lhs[0].(*ast.Ident)
-		if !ok || lhs.Name != name {
+		if exprName(assign.Lhs[0]) != name {
 			continue
 		}
 		if src := traceCallSource(assign.Rhs[0]); src != "" {
@@ -600,8 +596,7 @@ func traceNonEmptySource(stmts []ast.Stmt, before ast.Node, name string) string 
 			if len(s.Lhs) != 1 || len(s.Rhs) != 1 {
 				continue
 			}
-			lhs, ok := s.Lhs[0].(*ast.Ident)
-			if !ok || lhs.Name != name {
+			if exprName(s.Lhs[0]) != name {
 				continue
 			}
 			if src := traceCallSource(s.Rhs[0]); src != "" {
@@ -645,8 +640,17 @@ func bodyWritesMapEntry(body *ast.BlockStmt, name string) bool {
 	return false
 }
 
-func isSliceGuarded(stack []ast.Node, ident *ast.Ident) bool {
-	return isSliceNameGuarded(stack, ident.Name, nil)
+func isSliceGuarded(stack []ast.Node, expr ast.Expr) bool {
+	name := exprName(expr)
+	if _, ok := expr.(*ast.CallExpr); ok {
+		name = traceCallSource(expr)
+	}
+	if name == "" {
+		// Nothing to trace, such as an arbitrary call result,
+		// which cannot be length-checked without storing it first.
+		return true
+	}
+	return isSliceNameGuarded(stack, name, nil)
 }
 
 func isSliceNameGuarded(stack []ast.Node, name string, visited map[string]bool) bool {
@@ -804,8 +808,7 @@ func bodyAppendsTo(body *ast.BlockStmt, name string) bool {
 		if !ok || len(assign.Lhs) != 1 || len(assign.Rhs) != 1 {
 			continue
 		}
-		lhs, ok := assign.Lhs[0].(*ast.Ident)
-		if !ok || lhs.Name != name {
+		if exprName(assign.Lhs[0]) != name {
 			continue
 		}
 		call, ok := assign.Rhs[0].(*ast.CallExpr)
@@ -819,8 +822,7 @@ func bodyAppendsTo(body *ast.BlockStmt, name string) bool {
 		if len(call.Args) < 1 {
 			continue
 		}
-		first, ok := call.Args[0].(*ast.Ident)
-		if !ok || first.Name != name {
+		if exprName(call.Args[0]) != name {
 			continue
 		}
 		return true
@@ -901,8 +903,7 @@ func makeLenSource(assign *ast.AssignStmt, name string) string {
 	if len(assign.Lhs) != 1 || len(assign.Rhs) != 1 {
 		return ""
 	}
-	lhs, ok := assign.Lhs[0].(*ast.Ident)
-	if !ok || lhs.Name != name {
+	if exprName(assign.Lhs[0]) != name {
 		return ""
 	}
 	call, ok := assign.Rhs[0].(*ast.CallExpr)
