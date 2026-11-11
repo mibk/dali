@@ -3,8 +3,11 @@ package a
 import (
 	"context"
 	"database/sql/driver"
+	"log"
 	"maps"
+	"os"
 	"slices"
+	"testing"
 	"time"
 
 	"github.com/mibk/dali"
@@ -145,6 +148,54 @@ func checkGuardedBailoutPanic(db *dali.DB) {
 		panic("unreachable")
 	}
 	db.Query("SELECT ?...", items) // OK
+}
+
+func checkGuardedBailoutOr(db *dali.DB, ok bool) {
+	items := []int{1, 2}
+	if len(items) == 0 || !ok {
+		return
+	}
+	db.Query("SELECT ?...", items) // OK
+}
+
+func checkUnguardedBailoutAnd(db *dali.DB, ok bool) {
+	items := []int{1, 2}
+	if len(items) == 0 && !ok {
+		return
+	}
+	db.Query("SELECT ?...", items) // want `slice "items" passed to \?\.\.\. without a length check`
+}
+
+func checkGuardedBailoutLogFatal(db *dali.DB) {
+	items := []int{1, 2}
+	if len(items) == 0 {
+		log.Fatal("no items")
+	}
+	db.Query("SELECT ?...", items) // OK
+}
+
+func checkGuardedBailoutOsExit(db *dali.DB) {
+	items := []int{1, 2}
+	if len(items) == 0 {
+		os.Exit(1)
+	}
+	db.Query("SELECT ?...", items) // OK
+}
+
+func checkGuardedBailoutTestingSkip(t *testing.T, db *dali.DB) {
+	items := []int{1, 2}
+	if len(items) == 0 {
+		t.Skip("no items")
+	}
+	db.Query("SELECT ?...", items) // OK
+}
+
+func checkUnguardedBailoutLogPrint(db *dali.DB) {
+	items := []int{1, 2}
+	if len(items) == 0 {
+		log.Print("no items")
+	}
+	db.Query("SELECT ?...", items) // want `slice "items" passed to \?\.\.\. without a length check`
 }
 
 func checkGuardedPositive(db *dali.DB) {

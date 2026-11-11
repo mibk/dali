@@ -770,8 +770,7 @@ func hasBailoutGuard(stmts []ast.Stmt, before ast.Node, name string) bool {
 // reaching code after the chain implies the guard condition was false.
 func ifChainGuardsSlice(ifStmt *ast.IfStmt, name string) bool {
 	for {
-		op, val, ok := matchLenCheck(ifStmt.Cond, name)
-		if ok && isZeroGuard(op, val) && (blockTerminates(ifStmt.Body) || blockAssigns(ifStmt.Body, name)) {
+		if condHasZeroLenGuard(ifStmt.Cond, name) && (blockTerminates(ifStmt.Body) || blockAssigns(ifStmt.Body, name)) {
 			return true
 		}
 		// Walk into the else-if chain only when the current body
@@ -980,6 +979,18 @@ func condHasPositiveLenGuard(expr ast.Expr, name string) bool {
 	return isPositiveGuard(op, val)
 }
 
+// condHasZeroLenGuard reports whether expr (or any disjunct in an ||
+// chain) is a zero-length check for name.
+// Past a bail-out on expr every disjunct is false, so len(name) > 0.
+func condHasZeroLenGuard(expr ast.Expr, name string) bool {
+	expr = ast.Unparen(expr)
+	if bin, ok := expr.(*ast.BinaryExpr); ok && bin.Op == token.LOR {
+		return condHasZeroLenGuard(bin.X, name) || condHasZeroLenGuard(bin.Y, name)
+	}
+	op, val, ok := matchLenCheck(expr, name)
+	return ok && isZeroGuard(op, val)
+}
+
 func isLenCall(expr ast.Expr, name string) bool {
 	call, ok := expr.(*ast.CallExpr)
 	if !ok || len(call.Args) != 1 {
@@ -1049,10 +1060,30 @@ func blockTerminates(block *ast.BlockStmt) bool {
 		return true
 	case *ast.ExprStmt:
 		if call, ok := s.X.(*ast.CallExpr); ok {
-			if fn, ok := call.Fun.(*ast.Ident); ok && fn.Name == "panic" {
-				return true
-			}
+			return isTerminatingCall(call)
 		}
+	}
+	return false
+}
+
+// neverReturn lists the functions and methods of log, *log.Logger
+// and testing.TB that do not return.
+// They are matched by name alone, whatever the receiver.
+var neverReturn = map[string]bool{
+	"Fatal": true, "Fatalf": true, "Fatalln": true,
+	"Panic": true, "Panicf": true, "Panicln": true,
+	"FailNow": true, "Skip": true, "Skipf": true, "SkipNow": true,
+}
+
+func isTerminatingCall(call *ast.CallExpr) bool {
+	switch fn := call.Fun.(type) {
+	case *ast.Ident:
+		return fn.Name == "panic"
+	case *ast.SelectorExpr:
+		if x, ok := fn.X.(*ast.Ident); ok && x.Name == "os" && fn.Sel.Name == "Exit" {
+			return true
+		}
+		return neverReturn[fn.Sel.Name]
 	}
 	return false
 }
