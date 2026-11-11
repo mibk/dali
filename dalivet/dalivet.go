@@ -7,6 +7,7 @@ import (
 	"go/constant"
 	"go/token"
 	"go/types"
+	"reflect"
 	"slices"
 	"strconv"
 	"strings"
@@ -43,6 +44,9 @@ type checker struct {
 	// nonEmptyVars holds the package-level variables
 	// initialized with a non-empty slice or map literal.
 	nonEmptyVars map[types.Object]bool
+
+	// taggedFields holds the fields whose db tag was already reported.
+	taggedFields map[*types.Var]bool
 }
 
 type lineKey struct {
@@ -56,7 +60,12 @@ func run(pass *analysis.Pass) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	c := &checker{pass: pass, ignored: ignored, nonEmptyVars: nonEmptyPkgVars(pass)}
+	c := &checker{
+		pass:         pass,
+		ignored:      ignored,
+		nonEmptyVars: nonEmptyPkgVars(pass),
+		taggedFields: make(map[*types.Var]bool),
+	}
 
 	nodeFilter := []ast.Node{
 		(*ast.CallExpr)(nil),
@@ -230,7 +239,9 @@ func (c *checker) checkOneArg(arg ast.Expr) {
 	}
 	if !skipTypeCheck(ptr) && !isStruct(ptr) {
 		c.reportf(arg.Pos(), "One requires a pointer to a struct, got %s", t)
+		return
 	}
+	c.checkDBTags(arg, ptr, false)
 }
 
 // checkAllArg checks that All's argument is *[]Struct or *[]*Struct.
@@ -262,7 +273,9 @@ func (c *checker) checkAllArg(arg ast.Expr) {
 	}
 	if !skipTypeCheck(elem) && !isStruct(elem) {
 		c.reportf(arg.Pos(), "All requires a pointer to a slice of structs, got %s", t)
+		return
 	}
+	c.checkDBTags(arg, elem, false)
 }
 
 // checkScanAllRowsArg checks that each argument is *[]T.
@@ -479,7 +492,13 @@ func (c *checker) checkPlaceholderType(arg ast.Expr, ph Placeholder, argType typ
 		case "values": // ?values...
 			if !isSliceOfStructs(argType) {
 				c.reportf(arg.Pos(), "?values... requires a slice of structs, got %s", argType)
+				return
 			}
+			elem := argType.Underlying().(*types.Slice).Elem()
+			if p, ok := elem.(*types.Pointer); ok {
+				elem = p.Elem()
+			}
+			c.checkDBTags(arg, elem, true)
 		}
 		return
 	}
@@ -540,9 +559,69 @@ func (c *checker) checkStructOrMap(arg ast.Expr, t types.Type, placeholder strin
 		t = p
 	}
 	if isStruct(t) {
+		c.checkDBTags(arg, t, true)
 		return
 	}
 	c.reportf(arg.Pos(), "%s requires a struct or dali.Map, got %s", placeholder, orig)
+}
+
+// checkDBTags reports the db tag options that the runtime ignores
+// in the fields it maps of the struct type t.
+// A field of this package is reported once, at the field;
+// a field of another package at each use, the only place this pass can report.
+// It walks the fields like colNamesAndFieldIndexesBase in derive.go,
+// where insert is true for ?values and ?set.
+func (c *checker) checkDBTags(arg ast.Expr, t types.Type, insert bool) {
+	st, ok := t.Underlying().(*types.Struct)
+	if !ok {
+		return
+	}
+	for i := 0; i < st.NumFields(); i++ {
+		f := st.Field(i)
+		if !f.Exported() && !f.Embedded() {
+			continue
+		}
+		opts := strings.Split(reflect.StructTag(st.Tag(i)).Get("db"), ",")
+		if opts[0] == "-" {
+			continue
+		}
+		var selectOnly bool
+		for _, opt := range opts[1:] {
+			switch opt {
+			case "selectonly":
+				selectOnly = true
+			case "":
+			default:
+				c.reportTag(arg, t, f, opt)
+			}
+		}
+		if insert && selectOnly {
+			continue
+		}
+		// The runtime keeps a time.Time field whole, but it has
+		// no exported or embedded fields to check anyway.
+		ft := f.Type()
+		switch {
+		case !isStruct(ft):
+		case insert && implementsValuer(ft):
+		case !insert && (implementsScanner(ft) || implementsScanner(types.NewPointer(ft))):
+		default:
+			c.checkDBTags(arg, ft, insert)
+		}
+	}
+}
+
+func (c *checker) reportTag(arg ast.Expr, t types.Type, f *types.Var, opt string) {
+	pos := arg.Pos()
+	if f.Pkg() == c.pass.Pkg {
+		if c.taggedFields[f] {
+			return
+		}
+		c.taggedFields[f] = true
+		pos = f.Pos()
+	}
+	c.reportf(pos, "field %s.%s: unknown db tag option %q (dali ignores it)",
+		types.TypeString(t, types.RelativeTo(c.pass.Pkg)), f.Name(), opt)
 }
 
 func (c *checker) isTimeConvertible(t types.Type) bool {
@@ -651,6 +730,10 @@ func implementsMarshaler(t types.Type) bool {
 
 func implementsValuer(t types.Type) bool {
 	return hasMethod(t, "Value", 0, 2)
+}
+
+func implementsScanner(t types.Type) bool {
+	return hasMethod(t, "Scan", 1, 1)
 }
 
 // nonEmptyPreserving lists stdlib functions that preserve the non-emptiness

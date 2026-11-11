@@ -689,6 +689,58 @@ func checkNonEmptyPkgVar(db *dali.DB) {
 	db.Query("SELECT ?...", defaultIDs) // want `slice "defaultIDs" passed to \?\.\.\. without a length check`
 }
 
+type Tagged struct {
+	ID      int    `db:"id,readonly"` // want `field Tagged\.ID: unknown db tag option "readonly" \(dali ignores it\)`
+	Name    string `db:"name,selectonly,"`
+	Note    string `db:"-"`
+	comment string `db:"comment,bogus"`
+}
+
+type TagParent struct {
+	tagBase
+	Child  TagChild
+	Ptr    *TagChild
+	Custom TagValue
+	Since  time.Time
+}
+
+type tagBase struct {
+	Kind string `db:"kind,bogus"` // want `field tagBase\.Kind: unknown db tag option "bogus" \(dali ignores it\)`
+}
+
+type TagChild struct {
+	Ref int `db:"ref,unique"` // want `field TagChild\.Ref: unknown db tag option "unique" \(dali ignores it\)`
+}
+
+type TagSelectOnly struct {
+	Child TagChild `db:",selectonly"`
+}
+
+type TagValue struct {
+	V int `db:"v,bogus"`
+}
+
+func (TagValue) Value() (driver.Value, error) { return nil, nil }
+func (*TagValue) Scan(src any) error          { return nil }
+
+func checkDBTags(db *dali.DB, q *dali.Query) {
+	var t Tagged
+	var ts []*Tagged
+	q.One(&t)
+	q.All(&ts)
+	db.Query("INSERT ?values", t)
+	db.Query("UPDATE ?set", &t)
+	db.Query("INSERT ?values...", ts[:1])
+	db.Query("INSERT ?values", dali.Map{}) // OK
+
+	var p TagParent
+	q.One(&p)
+
+	var s TagSelectOnly
+	q.One(&s)
+	db.Query("INSERT ?values", s) // OK: selectonly fields are not inserted
+}
+
 func checkRepeatedSlice(db *dali.DB, items, ids []int) {
 	db.Query("SELECT ?... UNION SELECT ?... UNION SELECT ?...",
 		items, // want `slice "items" passed to \?\.\.\. without a length check`
