@@ -397,3 +397,10 @@ func checkGuardedDerivedViaSelectorRangeMapChain(db *dali.DB) {
 	ids := slices.Sorted(maps.Keys(dedup))
 	db.Query("SELECT ?...", ids) // OK
 }
+
+func checkMethodExpression(db *dali.DB, q *dali.Query) {
+	(*dali.DB).Query(db, "SELECT 1")       // OK
+	(*dali.DB).Query(db, "SELECT ?, ?", 1) // want `DB\.Query has 2 placeholder\(s\) but 1 arg\(s\)`
+	var ids []int
+	(*dali.Query).ScanAllRows(q, &ids) // OK
+}

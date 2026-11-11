@@ -71,6 +71,17 @@ func run(pass *analysis.Pass) (any, error) {
 		typeName := namedObj.Name()
 		methodName := sel.Sel.Name
 
+		// In a method expression like (*dali.DB).Query(db, q)
+		// the receiver is the first argument.
+		if s := pass.TypesInfo.Selections[sel]; s != nil && s.Kind() == types.MethodExpr {
+			if len(call.Args) == 0 {
+				return true
+			}
+			shifted := *call
+			shifted.Args = call.Args[1:]
+			call = &shifted
+		}
+
 		switch typeName {
 		case "Query":
 			c.checkQueryMethods(call, methodName)
