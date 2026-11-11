@@ -309,6 +309,10 @@ func (c *checker) checkDBTxMethods(call *ast.CallExpr, method, typeName string, 
 	queryExpr := call.Args[queryArgIdx]
 	tv, ok := c.pass.TypesInfo.Types[queryExpr]
 	if !ok || tv.Value == nil || tv.Value.Kind() != constant.String {
+		if c.isEnclosingParam(stack, queryExpr) {
+			// A thin wrapper forwards a query it cannot make constant.
+			return
+		}
 		c.reportf(queryExpr.Pos(), "%s.%s requires a constant query string", typeName, method)
 		return
 	}
@@ -401,6 +405,39 @@ func (c *checker) checkDBTxMethods(call *ast.CallExpr, method, typeName string, 
 		}
 		argIdx++
 	}
+}
+
+// isEnclosingParam reports whether expr is a parameter
+// of the innermost function enclosing the call.
+func (c *checker) isEnclosingParam(stack []ast.Node, expr ast.Expr) bool {
+	id, ok := expr.(*ast.Ident)
+	if !ok {
+		return false
+	}
+	obj := c.pass.TypesInfo.Uses[id]
+	if obj == nil {
+		return false
+	}
+	for i := len(stack) - 1; i >= 0; i-- {
+		var ft *ast.FuncType
+		switch fn := stack[i].(type) {
+		case *ast.FuncDecl:
+			ft = fn.Type
+		case *ast.FuncLit:
+			ft = fn.Type
+		default:
+			continue
+		}
+		for _, field := range ft.Params.List {
+			for _, name := range field.Names {
+				if c.pass.TypesInfo.Defs[name] == obj {
+					return true
+				}
+			}
+		}
+		return false
+	}
+	return false
 }
 
 func isValidPlaceholder(typ string) bool {

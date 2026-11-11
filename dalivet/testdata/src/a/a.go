@@ -464,6 +464,27 @@ func checkNonConstantQuery(db *dali.DB, tx *dali.Tx) {
 	tx.Prepare(q) // OK: const
 }
 
+type wrapper struct{ db *dali.DB }
+
+func (w *wrapper) Query(sql string, args ...any) *dali.Query {
+	return w.db.Query(sql, args...) // OK: forwarded
+}
+
+func (w *wrapper) QueryWithContext(ctx context.Context, sql string, args ...any) *dali.Query {
+	return w.db.QueryWithContext(ctx, sql, args...) // OK: forwarded
+}
+
+func (w *wrapper) Count(table string) *dali.Query {
+	q := "SELECT COUNT(*) FROM " + table
+	return w.db.Query(q) // want `DB\.Query requires a constant query string`
+}
+
+func (w *wrapper) Deferred(sql string) func() *dali.Query {
+	return func() *dali.Query {
+		return w.db.Query(sql) // want `DB\.Query requires a constant query string`
+	}
+}
+
 func checkGuardedDerived(db *dali.DB) {
 	m := map[int]bool{1: true}
 	if len(m) > 0 {
