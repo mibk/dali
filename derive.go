@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"reflect"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -50,7 +51,7 @@ func colNamesAndFieldIndexesBase(baseIndex []int, typ reflect.Type, insert bool)
 				// Known struct.
 
 			case f.Anonymous, f.IsExported():
-				emCols, emIndexes := colNamesAndFieldIndexesBase(append(baseIndex, i), f.Type, insert)
+				emCols, emIndexes := colNamesAndFieldIndexesBase(slices.Concat(baseIndex, []int{i}), f.Type, insert)
 				cols = append(cols, emCols...)
 				indexes = append(indexes, emIndexes...)
 				continue
@@ -69,7 +70,7 @@ func colNamesAndFieldIndexesBase(baseIndex []int, typ reflect.Type, insert bool)
 			prop.ColName = f.Name
 		}
 		cols = append(cols, prop.ColName)
-		indexes = append(indexes, append(baseIndex, i))
+		indexes = append(indexes, slices.Concat(baseIndex, []int{i}))
 	}
 	return cols, indexes
 }
