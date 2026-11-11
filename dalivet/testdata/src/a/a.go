@@ -519,3 +519,18 @@ func checkMethodExpression(db *dali.DB, q *dali.Query) {
 	var ids []int
 	(*dali.Query).ScanAllRows(q, &ids) // OK
 }
+
+func checkGeneric[T any, S ~string](db *dali.DB, rows []T, names []S) {
+	if len(rows) == 0 || len(names) == 0 {
+		return
+	}
+	db.Query("INSERT ?values...", rows) // OK: T is unknown
+	db.Query("SELECT ?ident...", names) // OK: S is unknown
+}
+
+func checkGenericPointer[T any](db *dali.DB, rows []*T) {
+	if len(rows) == 0 {
+		return
+	}
+	db.Query("INSERT ?values...", rows) // OK: T is unknown
+}

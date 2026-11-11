@@ -316,6 +316,15 @@ func isExpandable(typ string) bool {
 
 func (c *checker) checkPlaceholderType(arg ast.Expr, ph Placeholder, argType types.Type) {
 	if ph.Expand {
+		if sl, ok := argType.Underlying().(*types.Slice); ok {
+			elem := sl.Elem()
+			if p, ok := elem.(*types.Pointer); ok {
+				elem = p.Elem()
+			}
+			if isTypeParam(elem) {
+				return
+			}
+		}
 		switch ph.Type {
 		case "": // ?...
 			if !isSlice(argType) {
