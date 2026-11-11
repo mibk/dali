@@ -335,8 +335,8 @@ func (c *checker) checkPlaceholderType(arg ast.Expr, ph Placeholder, argType typ
 				c.pass.Reportf(arg.Pos(), "?ident... requires []string, got %s", argType)
 			}
 		case "values": // ?values...
-			if !isSliceOfStructsOrMaps(argType) {
-				c.pass.Reportf(arg.Pos(), "?values... requires a slice of structs or dali.Map, got %s", argType)
+			if !isSliceOfStructs(argType) {
+				c.pass.Reportf(arg.Pos(), "?values... requires a slice of structs, got %s", argType)
 			}
 		}
 		return
@@ -390,14 +390,14 @@ func (c *checker) checkScalarArg(arg ast.Expr, t types.Type) {
 }
 
 func (c *checker) checkStructOrMap(arg ast.Expr, t types.Type, placeholder string) {
+	if isDaliMap(t) {
+		return
+	}
 	orig := t
 	if p, ok := deref(t); ok {
 		t = p
 	}
 	if isStruct(t) {
-		return
-	}
-	if isDaliMap(t) {
 		return
 	}
 	c.pass.Reportf(arg.Pos(), "%s requires a struct or dali.Map, got %s", placeholder, orig)
@@ -491,7 +491,7 @@ func isDaliMap(t types.Type) bool {
 	return obj.Pkg() != nil && obj.Pkg().Path() == daliPkg && obj.Name() == "Map"
 }
 
-func isSliceOfStructsOrMaps(t types.Type) bool {
+func isSliceOfStructs(t types.Type) bool {
 	sl, ok := t.Underlying().(*types.Slice)
 	if !ok {
 		return false
@@ -500,7 +500,7 @@ func isSliceOfStructsOrMaps(t types.Type) bool {
 	if p, ok := elem.(*types.Pointer); ok {
 		elem = p.Elem()
 	}
-	return isStruct(elem) || isDaliMap(elem)
+	return isStruct(elem)
 }
 
 func implementsMarshaler(t types.Type) bool {

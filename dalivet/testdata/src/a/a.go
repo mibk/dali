@@ -96,6 +96,10 @@ func checkPlaceholderTypes(db *dali.DB) {
 	db.Query("INSERT ?values", dali.Map{"a": 1}) // OK: dali.Map
 	db.Query("INSERT ?values", 42)               // want `\?values requires a struct or dali\.Map, got int`
 
+	db.Query("INSERT ?values", &dali.Map{"a": 1})       // want `\?values requires a struct or dali\.Map, got \*github\.com/mibk/dali\.Map`
+	db.Query("INSERT ?values...", []dali.Map{{"a": 1}}) // want `\?values\.\.\. requires a slice of structs, got \[\]github\.com/mibk/dali\.Map`
+	db.Query("INSERT ?values...", []*User{{}})          // OK
+
 	db.Query("UPDATE ?set", &u) // OK
 	db.Query("UPDATE ?set", 42) // want `\?set requires a struct or dali\.Map, got int`
 
