@@ -154,6 +154,18 @@ func checkGuardedPositive(db *dali.DB) {
 	}
 }
 
+func checkUnguardedPositiveElse(db *dali.DB) {
+	items := []int{1, 2}
+	if len(items) > 0 {
+	} else {
+		db.Query("SELECT ?...", items) // want `slice "items" passed to \?\.\.\. without a length check`
+	}
+	if len(items) > 0 {
+	} else if true {
+		db.Query("SELECT ?...", items) // want `slice "items" passed to \?\.\.\. without a length check`
+	}
+}
+
 func checkGuardedNotEqual(db *dali.DB) {
 	items := []int{1, 2}
 	if len(items) != 0 {
