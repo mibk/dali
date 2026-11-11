@@ -142,6 +142,8 @@ var placeholderTests = []struct {
 	{"SELECT * WHERE x IN (?...)", Args{[]string{}}, "SELECT * WHERE x IN (NULL)"},
 
 	{"?values", Args{Deep1{Deep2{Deep3{Deep4{1, 2}}}}}, "({X}, {Y}) VALUES (1, 2)"},
+	{"?values", Args{IgnoredStruct{1, personProps{"x"}}}, "({ID}) VALUES (1)"},
+	{"?values", Args{SelectOnlyStruct{1, personProps{"x"}}}, "({ID}) VALUES (1)"},
 }
 
 func TestPlaceholders(t *testing.T) {
@@ -237,6 +239,16 @@ type Deep1 struct{ Deep2 }
 type Deep2 struct{ Deep3 }
 type Deep3 struct{ Deep4 }
 type Deep4 struct{ X, Y int }
+
+type IgnoredStruct struct {
+	ID    int
+	Props personProps `db:"-"`
+}
+
+type SelectOnlyStruct struct {
+	ID          int
+	personProps `db:",selectonly"`
+}
 
 type Where struct {
 	conds []string

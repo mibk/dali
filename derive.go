@@ -42,6 +42,10 @@ func colNamesAndFieldIndexes(typ reflect.Type, insert bool) (cols []string, inde
 func colNamesAndFieldIndexesBase(baseIndex []int, typ reflect.Type, insert bool) (cols []string, indexes [][]int) {
 	for i := 0; i < typ.NumField(); i++ {
 		f := typ.Field(i)
+		prop := parseFieldProp(f.Tag.Get("db"))
+		if prop.Ignore || insert && prop.SelectOnly {
+			continue
+		}
 
 		if f.Type.Kind() == reflect.Struct {
 			switch {
@@ -59,11 +63,6 @@ func colNamesAndFieldIndexesBase(baseIndex []int, typ reflect.Type, insert bool)
 		}
 
 		if !f.IsExported() {
-			continue
-		}
-
-		prop := parseFieldProp(f.Tag.Get("db"))
-		if prop.Ignore || insert && prop.SelectOnly {
 			continue
 		}
 		if prop.ColName == "" {
