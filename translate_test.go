@@ -3,6 +3,7 @@ package dali
 import (
 	"database/sql"
 	"database/sql/driver"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -504,5 +505,18 @@ func BenchmarkMultiValuesClause(b *testing.B) {
 			{104, "Luboš"},
 			{889, "Ibrahim"},
 		}})
+	}
+}
+
+var errValuer = errors.New("valuer failed")
+
+type failingValuer struct{}
+
+func (failingValuer) Value() (driver.Value, error) { return nil, errValuer }
+
+func TestErrorsWrap(t *testing.T) {
+	_, err := translate(NewFakeDialect(), "?", Args{failingValuer{}})
+	if !errors.Is(err, errValuer) {
+		t.Errorf("got %v, want it to wrap %v", err, errValuer)
 	}
 }

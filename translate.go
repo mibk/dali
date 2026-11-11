@@ -62,7 +62,7 @@ func (t Translator) Translate(sql string, args []any) (string, error) {
 	t.args = args
 	s, err := t.translate(sql)
 	if err != nil {
-		return "", fmt.Errorf("dali: %v", err)
+		return "", fmt.Errorf("dali: %w", err)
 	}
 	return s, nil
 }
@@ -191,7 +191,7 @@ func (t *Translator) interpolate(b *bytes.Buffer, typ string, expand bool) error
 			case Marshaler:
 				sql, err := arg.MarshalSQL(t.clone())
 				if err != nil {
-					return fmt.Errorf("marshal SQL: %v", err)
+					return fmt.Errorf("marshal SQL: %w", err)
 				}
 				b.WriteString(sql)
 			case string:
