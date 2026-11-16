@@ -140,8 +140,6 @@ var placeholderTests = []struct {
 		"SELECT WHERE (name = 'Josef') AND (age > 30)",
 	},
 
-	{"SELECT * WHERE x IN (?...)", Args{[]string{}}, "SELECT * WHERE x IN (NULL)"},
-
 	{"?values", Args{Deep1{Deep2{Deep3{Deep4{1, 2}}}}}, "({X}, {Y}) VALUES (1, 2)"},
 	{"?values", Args{IgnoredStruct{1, personProps{"x"}}}, "({ID}) VALUES (1)"},
 	{"?values", Args{SelectOnlyStruct{1, personProps{"x"}}}, "({ID}) VALUES (1)"},
@@ -296,6 +294,8 @@ var errorTests = []struct {
 	},
 
 	// empty slice
+	{"SELECT * WHERE x IN (?...)", Args{[]string{}}, "dali: empty slice passed to ?..."},
+	{"SELECT * WHERE x IN (?...)", Args{[]int(nil)}, "dali: empty slice passed to ?..."},
 	{"SELECT ?ident...", Args{[]int{}}, "dali: ?ident... expects the argument to be a []string"},
 	{"SELECT ?ident...", Args{[]string{}}, "dali: empty slice passed to ?ident..."},
 	{

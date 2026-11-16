@@ -287,8 +287,7 @@ func (e *Expander) escapeMultipleValues(b *bytes.Buffer, v any) error {
 	}
 	length := vv.Len()
 	if length == 0 {
-		b.WriteString("NULL")
-		return nil
+		return fmt.Errorf("empty slice passed to ?...")
 	}
 	for i := range length {
 		if i > 0 {

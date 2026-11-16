@@ -14,7 +14,9 @@
 //
 //	?          primitive value or a value implementing driver.Valuer
 //	?...       a slice of values which is going to be expanded (especially useful in
-//	           IN clauses)
+//	           IN clauses).
+//	           An empty or nil slice is an error,
+//	           so check the length before running the query.
 //	?values    expects either Map, or a struct as an argument. It derives column names
 //	           from map keys or struct fields and constructs a VALUES clause (e.g.
 //	           INSERT INTO user ?values)
