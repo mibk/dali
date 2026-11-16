@@ -230,7 +230,7 @@ for more information.
 
 ### Supported dialects
 
-Currently, only a MySQL dialect is implemented directly in this package (see [dialects](dialects)
+Currently, only a MySQL dialect is implemented directly in this package (see [dialect](dialect)
 for more information). Nevertheless, supporting another dialect should be as easy as creating
 a new dialect implementing *dialect.Escaper* interface. The most common dialects will be
 implemented directly in the future.

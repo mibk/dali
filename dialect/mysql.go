@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-// MySQL is the implementation of Dialect for MySQL drivers.
+// MySQL is the implementation of Escaper for MySQL drivers.
 //
 // Note that the EscapeTime method ignores the time zone, so if you
 // want to work with time zones different from your MySQL connection

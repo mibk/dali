@@ -30,7 +30,7 @@ type Escaper interface {
 // Deprecated: Use Escaper.
 type Dialect = Escaper
 
-// writeByte is a helper func for Dialect implementors.
+// writeByte is a helper func for Escaper implementors.
 func writeByte(w io.Writer, b byte) (n int, err error) {
 	return w.Write([]byte{b})
 }
